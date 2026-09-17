@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Billing History | Cafe POS{% endblock %}
+{% block eyebrow %}Billing / History{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Billing History</h1><p>Review saved bills and print receipts.</p></div><a class="btn btn-primary" href="{% url 'billing' %}">+ New Bill</a></div>
+<div class="card"><form method="get" class="actions"><input type="search" name="q" value="{{ query }}" placeholder="Search bill no. or customer" aria-label="Search bills"><input type="date" name="date" value="{{ selected_date }}" aria-label="Filter by date"><button type="submit">Search</button>{% if query or selected_date %}<a class="btn btn-outline" href="{% url 'billing_history' %}">Clear</a>{% endif %}</form></div>
+<div class="card"><div class="table-wrap"><table class="data-table"><thead><tr><th>Bill No.</th><th>Date</th><th>Customer</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead><tbody>
+{% for bill in bills %}<tr><td><b>{{ bill.bill_number }}</b></td><td>{{ bill.created_at|date:"d M Y, h:i A" }}</td><td>{{ bill.customer.name|default:"Walk-in customer" }}</td><td><b>₹{{ bill.grand_total|floatformat:2 }}</b></td><td><span class="pill pill-muted">{{ bill.get_payment_method_display }}</span></td><td><div class="actions"><a class="btn btn-soft" href="{% url 'bill_detail' bill.id %}">View</a><a class="btn btn-outline" href="{% url 'bill_detail' bill.id %}?print=1" target="_blank">Print Bill</a><form method="post" action="{% url 'bill_delete' bill.id %}" onsubmit="return confirm('Delete this bill?');">{% csrf_token %}<button type="submit" class="btn-danger">Delete</button></form></div></td></tr>{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">No bills match your search.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

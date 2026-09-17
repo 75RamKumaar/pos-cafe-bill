@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Today's Sales | Cafe POS{% endblock %}
+{% block eyebrow %}Dashboard / Today's Sales{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Today's Sales</h1><p>Products sold and profit from completed bills today.</p></div></div>
+<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="card stat"><span class="stat-label">Today's Sales</span><h2 class="stat-value">₹{{ total_sales|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Products Sold</span><h2 class="stat-value">{{ total_quantity|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Today's Profit</span><h2 class="stat-value positive">₹{{ total_profit|floatformat:2 }}</h2></div></div>
+<div class="card"><div class="row" style="padding-top:0"><div><h2 style="margin-bottom:4px">Products Sold Today</h2><span class="muted">Grouped from today's saved bill items</span></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Product</th><th>Quantity Sold</th><th>Selling Amount</th><th>Profit</th></tr></thead><tbody>{% for product in products_sold %}<tr><td><b>{{ product.item_name }}</b>{% if product.menu_item__category %}<br><small class="muted">{{ product.menu_item__category }}</small>{% endif %}</td><td>{{ product.quantity_sold|floatformat:2 }}</td><td>₹{{ product.selling_amount|floatformat:2 }}</td><td class="positive">₹{{ product.profit|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:30px">No products sold today.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

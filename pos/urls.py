@@ -1,0 +1,32 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", views.pos, name="pos"),
+    path("billing/", views.billing, name="billing"),
+    path("billing/save/", views.bill_create, name="bill_create"),
+    path("billing/history/", views.billing_history, name="billing_history"),
+    path("customers/search/", views.customer_search, name="customer_search"),
+    path("billing/<int:bill_id>/", views.bill_detail, name="bill_detail"),
+    path("billing/<int:bill_id>/delete/", views.bill_delete, name="bill_delete"),
+    path("menu-items/", views.menu_items, name="menu_items"),
+    path("menu-items/add/", views.menu_item_create, name="menu_item_create"),
+    path("menu-items/<int:item_id>/edit/", views.menu_item_edit, name="menu_item_edit"),
+    path("menu-items/<int:item_id>/delete/", views.menu_item_delete, name="menu_item_delete"),
+    path("checkout/", views.checkout, name="checkout"),
+    path("customers/", views.customers, name="customers"),
+    path("customers/add/", views.customer_create, name="customer_create"),
+    path("customers/<int:customer_id>/", views.customer_detail, name="customer_detail"),
+    path("customers/<int:customer_id>/edit/", views.customer_edit, name="customer_edit"),
+    path("customers/<int:customer_id>/delete/", views.customer_delete, name="customer_delete"),
+    path("khata/", views.khata, name="khata"),
+    path("khata/<int:customer_id>/pay/", views.khata_payment, name="khata_payment"),
+    path("expenses/", views.expenses, name="expenses"),
+    path("expenses/add/", views.expense_create, name="expense_create"),
+    path("expenses/<int:expense_id>/edit/", views.expense_edit, name="expense_edit"),
+    path("expenses/<int:expense_id>/delete/", views.expense_delete, name="expense_delete"),
+    path("dashboard/", views.dashboard, name="dashboard"),
+    path("reports/", views.reports, name="reports"),
+    path("reports/export-sales/", views.export_sales_csv, name="export_sales_csv"),
+    path("settings/", views.settings_page, name="settings"),
+]

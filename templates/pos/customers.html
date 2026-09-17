@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Customers | Cafe POS{% endblock %}
+{% block eyebrow %}Customers / Directory{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Customers</h1><p>Keep customer details and bill history together.</p></div><a class="btn btn-primary" href="{% url 'customer_create' %}">+ Add Customer</a></div>
+<div class="card"><form method="get" class="actions"><input type="search" name="q" value="{{ query }}" placeholder="Search name or phone" aria-label="Search customers"><button type="submit">Search</button>{% if query %}<a class="btn btn-outline" href="{% url 'customers' %}">Clear</a>{% endif %}</form></div>
+<div class="card"><div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Balance</th><th>Actions</th></tr></thead><tbody>{% for customer in customers %}<tr><td><b>{{ customer.name }}</b></td><td>{{ customer.phone|default:"-" }}</td><td>{{ customer.email|default:"-" }}</td><td>{{ customer.balance|floatformat:2 }}</td><td><div class="actions"><a class="btn btn-soft" href="{% url 'customer_detail' customer.id %}">View</a><a class="btn btn-outline" href="{% url 'customer_edit' customer.id %}">Edit</a><form method="post" action="{% url 'customer_delete' customer.id %}" onsubmit="return confirm('Delete this customer?');">{% csrf_token %}<button class="btn-danger" type="submit">Delete</button></form></div></td></tr>{% empty %}<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">No customers found.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

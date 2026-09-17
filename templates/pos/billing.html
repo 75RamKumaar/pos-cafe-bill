@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Billing | Cafe POS{% endblock %}
+{% block eyebrow %}Billing / New order{% endblock %}
+{% block content %}
+<div class="page-head">
+<div><h1>Billing</h1><p>Build a bill quickly from the active menu.</p><small class="muted">Keyboard shortcuts enabled - press a product key to add it</small></div>
+<a class="btn btn-outline" href="{% url 'billing_history' %}">▤ Billing History</a>
+</div>
+<div class="billing-layout">
+<section>
+<div class="card">
+<div class="row" style="padding-top:0"><div><h3 style="margin-bottom:4px">Menu</h3><span class="muted">Tap an item to add it to the bill</span></div><span class="pill pill-success">{{ products|length }} active items</span></div>
+<div class="field"><label class="field-label" for="productSearch">Search products</label><input id="productSearch" type="search" placeholder="Search by product name" autocomplete="off"></div>
+<div class="category-tabs" id="categoryTabs"><button type="button" class="category-tab active" data-category="all">All items</button>{% for category in categories %}<button type="button" class="category-tab" data-category="{{ category|escapejs }}">{{ category }}</button>{% endfor %}</div>
+<div class="products" id="productGrid">
+{% for product in products %}
+<button type="button" class="product" data-id="{{ product.id }}" data-name="{{ product.name|escapejs }}" data-price="{{ product.price }}" data-category="{{ product.category|escapejs }}" data-shortcut="{{ product.shortcut_key|escapejs }}" onclick="addItem({{ product.id }})"><b>{% if product.shortcut_key %}<span class="pill pill-muted">[{{ product.shortcut_key }}]</span> {% endif %}{{ product.name }}</b><span>₹{{ product.price|floatformat:2 }}</span>{% if product.category %}<small>{{ product.category }}</small>{% endif %}</button>
+{% empty %}<div class="cart-empty">No active menu items. Add one from Menu Items.</div>{% endfor %}
+</div>
+</div>
+</section>
+<section class="billing-panel">
+<div class="card">
+<div class="row" style="padding-top:0"><div><h3 style="margin-bottom:4px">Current Bill</h3><span class="muted">Bill number generated when you generate the bill</span></div><button type="button" class="btn-soft" onclick="clearCart()">Clear</button></div>
+<div id="cart"><div class="cart-empty">Your bill is empty.<br>Choose items from the menu.</div></div>
+<div class="summary-line"><span>Subtotal</span><b>₹<span id="subtotal">0.00</span></b></div>
+<div class="field" style="margin:12px 0"><label class="field-label" for="discount">Discount</label><input id="discount" type="number" min="0" step="0.01" value="0" placeholder="0.00" oninput="renderCart()"></div>
+<div class="grand-total summary-line"><span>Total</span><b>₹<span id="grandTotal">0.00</span></b></div>
+<div class="field" style="margin-top:16px"><label class="field-label" for="customerSearch">Customer <span class="muted">(optional)</span></label><input id="customerSearch" type="search" placeholder="Search customer by name or phone" autocomplete="off"><input id="customer" type="hidden"><div id="customerSuggestions" class="card" style="display:none;padding:6px;margin:6px 0 0"></div><small id="selectedCustomer" class="muted">Walk-in customer</small></div>
+<div class="field"><span class="field-label">Payment method</span><div class="payment-grid">{% for value,label in payment_methods %}<label class="payment-option"><input type="radio" name="payment_method" value="{{ value }}"{% if forloop.first %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div></div>
+<div id="billingError" class="alert alert-error" style="display:none"></div>
+<button type="button" id="generateBillButton" class="btn btn-primary" style="width:100%" onclick="saveBill()">✓ Generate Bill</button>
+</div>
+</section>
+</div>
+<form style="display:none">{% csrf_token %}</form>
+<script>
+const cart = new Map();
+const products = {};
+const shortcutProducts = {};
+let shortcutBuffer = "";
+let shortcutTimer = null;
+let selectedCartId = null;
+document.querySelectorAll(".product").forEach((button) => { const product={id:Number(button.dataset.id), name:button.dataset.name, price:Number(button.dataset.price), category:button.dataset.category}; products[button.dataset.id] = product; if(button.dataset.shortcut)shortcutProducts[button.dataset.shortcut]=product; });
+function addItem(id){ const product=products[id]; if(!product)return; const key=String(id); const current=cart.get(key)||{...product,quantity:0}; current.quantity++; cart.set(key,current); selectedCartId=key; renderCart(); }
+function changeQuantity(id,delta){ const item=cart.get(String(id)); if(!item)return; item.quantity+=delta; if(item.quantity<=0)cart.delete(String(id)); selectedCartId=String(id); renderCart(); }
+function removeItem(id){cart.delete(String(id));if(selectedCartId===String(id))selectedCartId=null;renderCart();}
+function clearCart(){cart.clear();document.getElementById("discount").value="0";renderCart();}
+function renderCart(){
+ const cartEl=document.getElementById("cart"); let subtotal=0;
+ if(!cart.size){cartEl.innerHTML='<div class="cart-empty">Your bill is empty.<br>Choose items from the menu.</div>';}
+ else {cartEl.innerHTML=[...cart.values()].map(item=>{const total=item.price*item.quantity;subtotal+=total;return `<div class="cart-line${selectedCartId===String(item.id)?"" : ""}" onclick="selectedCartId='${item.id}'"><div><b>${escapeHtml(item.name)}</b><br><small class="muted">₹${item.price.toFixed(2)} each</small></div><div class="qty-control"><button type="button" onclick="event.stopPropagation();changeQuantity(${item.id},-1)">−</button><b>${item.quantity}</b><button type="button" onclick="event.stopPropagation();changeQuantity(${item.id},1)">+</button></div><div style="text-align:right"><b>₹${total.toFixed(2)}</b><br><button type="button" class="btn-soft" style="padding:4px 7px;font-size:11px;margin-top:4px" onclick="event.stopPropagation();removeItem(${item.id})">Remove</button></div></div>`}).join("");}
+ if(!cart.size)subtotal=0; const discount=Math.max(0,Number(document.getElementById("discount").value)||0); document.getElementById("subtotal").textContent=subtotal.toFixed(2); document.getElementById("grandTotal").textContent=Math.max(0,subtotal-discount).toFixed(2);
+}
+function escapeHtml(value){return value.replace(/[&<>'"]/g,(character)=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));}
+function getCookie(name){const row=document.cookie.split("; ").find((part)=>part.startsWith(name+"="));return row?decodeURIComponent(row.split("=")[1]):"";}
+async function saveBill(){
+ const error=document.getElementById("billingError"); error.style.display="none";
+ if(!cart.size){error.textContent="Add at least one item before saving.";error.style.display="block";return;}
+ const generateButton=document.getElementById("generateBillButton"); generateButton.disabled=true; generateButton.textContent="Generating Bill...";
+ const payment=document.querySelector('input[name="payment_method"]:checked'); const payload={items:[...cart.values()].map(item=>({id:item.id,quantity:item.quantity})),discount:document.getElementById("discount").value||"0",customer_id:document.getElementById("customer").value||null,payment_method:payment?payment.value:""};
+ const response=await fetch("{% url 'bill_create' %}",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":getCookie("csrftoken")},body:JSON.stringify(payload)}); const data=await response.json();
+ if(!response.ok){error.textContent=data.error||"Unable to generate this bill.";error.style.display="block";generateButton.disabled=false;generateButton.textContent="✓ Generate Bill";return;}
+ window.location.href=data.detail_url;
+}
+const customerSearch=document.getElementById("customerSearch"); const customerSuggestions=document.getElementById("customerSuggestions");
+customerSearch.addEventListener("input",async()=>{const query=customerSearch.value.trim();document.getElementById("customer").value="";document.getElementById("selectedCustomer").textContent="Walk-in customer";if(!query){customerSuggestions.style.display="none";return;}const response=await fetch(`{% url 'customer_search' %}?q=${encodeURIComponent(query)}`);const data=await response.json();customerSuggestions.innerHTML=data.customers.length?data.customers.map(customer=>`<button type="button" class="btn btn-outline" style="width:100%;margin:2px 0;justify-content:flex-start" onclick="selectCustomer(${customer.id},'${escapeHtml(customer.name)}')">${escapeHtml(customer.name)}${customer.phone?` · ${escapeHtml(customer.phone)}`:""}</button>`).join(""):"<span class='muted'>No matching customer</span>";customerSuggestions.style.display="block";});
+function selectCustomer(id,name){document.getElementById("customer").value=id;document.getElementById("customerSearch").value=name;document.getElementById("selectedCustomer").textContent=`Selected: ${name}`;customerSuggestions.style.display="none";}
+document.querySelectorAll(".category-tab").forEach((tab)=>tab.addEventListener("click",()=>{document.querySelectorAll(".category-tab").forEach((item)=>item.classList.remove("active"));tab.classList.add("active");const category=tab.dataset.category;document.querySelectorAll(".product").forEach((item)=>{item.style.display=category==="all"||item.dataset.category===category?"block":"none";});}));
+document.getElementById("productSearch").addEventListener("input",(event)=>{const query=event.target.value.trim().toLowerCase();document.querySelectorAll(".product").forEach((item)=>{item.style.display=item.dataset.name.toLowerCase().includes(query)?"block":"none";});});
+function clearShortcutBuffer(){shortcutBuffer="";if(shortcutTimer){clearTimeout(shortcutTimer);shortcutTimer=null;}}
+function commitShortcut(){const product=shortcutProducts[shortcutBuffer];clearShortcutBuffer();if(product)addItem(product.id);}
+function handleShortcutDigit(digit){
+ handleShortcutCharacter(digit);
+}
+function handleShortcutCharacter(character){
+ const candidate=shortcutBuffer+character;
+ if(shortcutBuffer && shortcutProducts[candidate]){shortcutBuffer=candidate;commitShortcut();return;}
+ if(shortcutBuffer && shortcutProducts[shortcutBuffer]){commitShortcut();shortcutBuffer=character;shortcutTimer=setTimeout(commitShortcut,500);return;}
+ if(shortcutBuffer)clearShortcutBuffer();
+ shortcutBuffer=character;shortcutTimer=setTimeout(commitShortcut,500);
+}
+document.addEventListener("keydown",(event)=>{const target=event.target;const isFormField=target.matches("input, textarea, select, [contenteditable='true']");if(isFormField)return;if(event.ctrlKey&&event.key==="Enter"){event.preventDefault();saveBill();return;}if(event.key==="Escape"){clearShortcutBuffer();return;}if(event.key==="Delete"&&selectedCartId){removeItem(selectedCartId);return;}if(event.key==="+"&&selectedCartId){changeQuantity(selectedCartId,1);return;}if(event.key==="-"&&selectedCartId){changeQuantity(selectedCartId,-1);return;}if(!/^[a-zA-Z0-9]$/.test(event.key))return;handleShortcutCharacter(event.key.toUpperCase());});
+renderCart();
+</script>
+{% endblock %}

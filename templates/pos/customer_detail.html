@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.name }} | Cafe POS{% endblock %}
+{% block eyebrow %}Customers / Details{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ customer.name }}</h1><p>{{ customer.phone|default:"No phone" }}{% if customer.email %} · {{ customer.email }}{% endif %}</p></div><div class="actions"><a class="btn btn-outline" href="{% url 'customer_edit' customer.id %}">Edit</a><a class="btn btn-primary" href="{% url 'billing' %}">+ New Bill</a></div></div>
+<div class="grid"><div class="card stat"><span class="stat-label">Total bills</span><h2 class="stat-value">{{ bill_count }}</h2></div><div class="card stat"><span class="stat-label">Total amount spent</span><h2 class="stat-value">₹{{ total_spent|floatformat:2 }}</h2></div></div>
+<div class="card"><h3>Customer details</h3><p><b>Address</b><br>{{ customer.address|default:"-"|linebreaksbr }}</p><p><b>Notes</b><br>{{ customer.notes|default:"-"|linebreaksbr }}</p></div>
+<div class="card"><h3>Billing history</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>Bill Number</th><th>Date</th><th>Total</th><th>Payment Method</th><th>Actions</th></tr></thead><tbody>{% for bill in bills %}<tr><td><b>{{ bill.bill_number }}</b></td><td>{{ bill.created_at|date:"d M Y, h:i A" }}</td><td>₹{{ bill.grand_total|floatformat:2 }}</td><td>{{ bill.get_payment_method_display }}</td><td><div class="actions"><a class="btn btn-soft" href="{% url 'bill_detail' bill.id %}">View Bill</a><a class="btn btn-outline" href="{% url 'bill_detail' bill.id %}" target="_blank">Print Bill</a></div></td></tr>{% empty %}<tr><td colspan="5" class="muted">No bills for this customer yet.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

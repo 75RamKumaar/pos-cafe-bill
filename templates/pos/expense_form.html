@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} | Cafe POS{% endblock %}
+{% block eyebrow %}Expenses / Entry{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ page_title }}</h1><p>Record operating costs for accurate daily net sales.</p></div></div>
+<div class="card" style="max-width:760px"><form method="post">{% csrf_token %}{% for field in form %}<div class="field"><label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<small class="negative">{{ error }}</small>{% endfor %}</div>{% endfor %}<div class="actions"><button class="btn btn-primary" type="submit">{{ submit_label }}</button><a class="btn btn-outline" href="{% url 'expenses' %}">Cancel</a></div></form></div>
+{% endblock %}

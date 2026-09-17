@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ bill.bill_number }} | Cafe POS{% endblock %}
+{% block eyebrow %}Billing / Bill details{% endblock %}
+{% block content %}
+<div class="alert alert-success no-print"><b>Bill Generated Successfully</b><br><span>Bill {{ bill.bill_number }} has been saved to Billing History.</span></div>
+<div class="actions no-print" style="margin-bottom:18px"><button class="btn btn-primary" type="button" onclick="window.print()">🖨 Print Bill</button><a class="btn btn-outline" href="{% url 'billing' %}">+ New Bill</a><a class="btn btn-soft" href="{% url 'bill_detail' bill.id %}">View Bill</a><a class="btn btn-outline" href="{% url 'billing_history' %}">← Bill History</a></div>
+<div class="invoice">
+<div class="invoice-head"><div><div class="invoice-brand">{{ business_settings.business_name }}</div>{% if business_settings.address %}<div class="muted">{{ business_settings.address }}</div>{% endif %}{% if business_settings.phone or business_settings.email %}<div class="muted">{% if business_settings.phone %}{{ business_settings.phone }}{% endif %}{% if business_settings.phone and business_settings.email %} · {% endif %}{% if business_settings.email %}{{ business_settings.email }}{% endif %}</div>{% endif %}{% if business_settings.tax_number %}<small class="muted">Tax No: {{ business_settings.tax_number }}</small>{% endif %}</div><div style="text-align:right"><b>Bill No: {{ bill.bill_number }}</b><br><span class="muted">Date: {{ bill.created_at|date:"d-m-Y" }}</span><br><span class="muted">Time: {{ bill.created_at|date:"h:i A" }}</span></div></div>
+<div class="row" style="border:0;padding:0 0 18px"><span class="muted">Customer</span><b>{{ bill.customer.name|default:"Walk-in customer" }}</b></div>
+<table class="invoice-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>{% for item in bill.items.all %}<tr><td>{{ item.item_name }}</td><td>{{ item.quantity|floatformat:2 }}</td><td>{{ business_settings.currency_symbol }}{{ item.price|floatformat:2 }}</td><td>{{ business_settings.currency_symbol }}{{ item.total|floatformat:2 }}</td></tr>{% endfor %}</tbody></table>
+<div class="invoice-total"><div class="summary-line"><span>Subtotal</span><b>{{ business_settings.currency_symbol }}{{ bill.subtotal|floatformat:2 }}</b></div><div class="summary-line"><span>Discount</span><b>- {{ business_settings.currency_symbol }}{{ bill.discount|floatformat:2 }}</b></div><div class="summary-line grand-total"><span>TOTAL</span><b>{{ business_settings.currency_symbol }}{{ bill.grand_total|floatformat:2 }}</b></div><div class="summary-line"><span>Payment method</span><b>{{ bill.get_payment_method_display }}</b></div></div>
+<p style="text-align:center;margin:42px 0 0" class="muted">{{ business_settings.invoice_footer }}</p>
+</div>
+{% if auto_print %}<script>window.addEventListener("load",()=>window.print());</script>{% endif %}
+{% endblock %}

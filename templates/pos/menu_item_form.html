@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} | Cafe POS{% endblock %}
+{% block eyebrow %}Menu / Edit catalog{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ page_title }}</h1><p>Make this item available for fast billing.</p></div><a class="btn btn-outline" href="{% url 'menu_items' %}">← Back to Menu</a></div>
+<div class="card" style="max-width:760px">
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
+{% for field in form %}<div class="field"><label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{% if field.errors %}{% for error in field.errors %}<div class="negative" style="margin-top:5px">{{ error }}</div>{% endfor %}{% endif %}{% if field.help_text %}<div class="helptext">{{ field.help_text }}</div>{% endif %}</div>{% endfor %}
+{% if form.non_field_errors %}{% for error in form.non_field_errors %}<div class="negative">{{ error }}</div>{% endfor %}{% endif %}
+<div class="actions"><button type="submit" class="btn-primary">{{ submit_label }}</button><a class="btn btn-outline" href="{% url 'menu_items' %}">Cancel</a></div>
+</form></div>
+{% endblock %}

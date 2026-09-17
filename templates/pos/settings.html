@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Settings | Cafe POS{% endblock %}
+{% block eyebrow %}Workspace / Settings{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Settings</h1><p>Current workspace configuration.</p></div></div>
+<div class="card" style="max-width:760px"><h3>Business / Profile</h3><form method="post">{% csrf_token %}{% for field in form %}<div class="field"><label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<small class="negative">{{ error }}</small>{% endfor %}</div>{% endfor %}<button class="btn btn-primary" type="submit">Save Settings</button></form></div>
+<div class="card" style="max-width:760px"><div class="row"><span class="muted">Timezone</span><b>Asia/Kolkata</b></div><div class="row"><span class="muted">Data storage</span><b>Local SQLite database</b></div></div>
+{% endblock %}

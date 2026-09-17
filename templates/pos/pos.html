@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Counter | Cafe POS{% endblock %}
+{% block content %}
+<div class="card">
+<h2>Counter</h2>
+<p class="muted">Tap an item to add it to the bill.</p>
+<div class="products">
+{% for p in products %}
+<button class="product" onclick="addItem({{p.id}})">
+<b>{{p.name}}</b>
+<span>₹{{p.price}}</span>
+</button>
+{% empty %}
+<p>No products yet.</p>
+{% endfor %}
+</div>
+</div>
+
+<div class="card">
+<h3>Current Bill</h3>
+<div id="cart"></div>
+<div class="row">
+<span><b>Total</b></span>
+<span class="total">₹<span id="total">0.00</span></span>
+</div>
+
+<div style="margin:14px 0">
+<select id="customer" style="width:100%">
+<option value="">Select Khata customer</option>
+{% for c in customers %}
+<option value="{{c.id}}">{{c.name}} — ₹{{c.balance|floatformat:2}}</option>
+{% endfor %}
+</select>
+</div>
+
+<div class="actions">
+<button class="cash" onclick="checkout('CASH')">CASH</button>
+<button class="upi" onclick="checkout('UPI')">UPI</button>
+<button class="khata" onclick="checkout('KHATA')">KHATA</button>
+<button class="danger" onclick="clearCart()">CLEAR</button>
+</div>
+</div>
+
+<script>
+const products = {
+{% for p in products %}
+{{p.id}}:{id:{{p.id}},name:"{{p.name|escapejs}}",price:{{p.price}}},
+{% endfor %}
+};
+let cart=[];
+
+function addItem(id){
+    const item=cart.find(x=>x.id===id);
+    if(item) item.quantity++;
+    else cart.push({id,quantity:1});
+    renderCart();
+}
+
+function changeQty(id,delta){
+    const item=cart.find(x=>x.id===id);
+    if(!item) return;
+    item.quantity+=delta;
+    if(item.quantity<=0) cart=cart.filter(x=>x.id!==id);
+    renderCart();
+}
+
+function renderCart(){
+    const el=document.getElementById("cart");
+    el.innerHTML=cart.map(i=>{
+        const p=products[i.id];
+        return `<div class="row">
+            <span>${p.name} × ${i.quantity}</span>
+            <span>
+                ₹${(p.price*i.quantity).toFixed(2)}
+                <button onclick="changeQty(${p.id},-1)">−</button>
+                <button onclick="changeQty(${p.id},1)">+</button>
+            </span>
+        </div>`;
+    }).join("");
+
+    const total=cart.reduce((sum,i)=>sum+products[i.id].price*i.quantity,0);
+    document.getElementById("total").innerText=total.toFixed(2);
+}
+
+function clearCart(){cart=[];renderCart();}
+
+function getCookie(name){
+    const row=document.cookie.split("; ").find(x=>x.startsWith(name+"="));
+    return row ? decodeURIComponent(row.split("=")[1]) : "";
+}
+
+async function checkout(mode){
+    if(!cart.length){alert("Add items first.");return;}
+    const customer=document.getElementById("customer").value;
+
+    if(mode==="KHATA" && !customer){
+        alert("Please select a Khata customer.");
+        return;
+    }
+
+    const response=await fetch("/checkout/",{
+        method:"POST",
+        headers:{
+            "Content-Type":"application/json",
+            "X-CSRFToken":getCookie("csrftoken")
+        },
+        body:JSON.stringify({
+            items:cart,
+            payment_mode:mode,
+            customer_id:customer
+        })
+    });
+
+    const data=await response.json();
+
+    if(!response.ok){
+        alert(data.error || "Checkout failed.");
+        return;
+    }
+
+    alert(`Order completed!\nInvoice: ${data.invoice}\nTotal: ₹${data.total}`);
+    clearCart();
+    document.getElementById("customer").value="";
+}
+
+renderCart();
+</script>
+{% endblock %}

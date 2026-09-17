@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Menu Items | Cafe POS{% endblock %}
+{% block eyebrow %}Menu / Catalog{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Menu Items</h1><p>Keep your café catalog current and billable.</p></div><a class="btn btn-primary" href="{% url 'menu_item_create' %}">+ Add Menu Item</a></div>
+<div class="card"><form method="get" class="actions"><input type="search" name="q" value="{{ query }}" placeholder="Search by item name" aria-label="Search menu items"><select name="category" aria-label="Filter by category"><option value="">All categories</option>{% for category in categories %}<option value="{{ category }}"{% if category == selected_category %} selected{% endif %}>{{ category }}</option>{% endfor %}</select><button type="submit" class="btn-primary">Filter</button>{% if query or selected_category %}<a class="btn btn-outline" href="{% url 'menu_items' %}">Clear</a>{% endif %}</form></div>
+<div class="card"><div class="table-wrap"><table class="data-table"><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+{% for item in items %}<tr><td>{% if item.image %}<img src="{{ item.image.url }}" alt="{{ item.name }}" style="width:42px;height:42px;object-fit:cover;border-radius:10px;vertical-align:middle;margin-right:8px">{% endif %}<b>{{ item.name }}</b></td><td>{{ item.category }}</td><td><b>₹{{ item.price|floatformat:2 }}</b></td><td class="muted">{{ item.description|default:"-"|truncatechars:60 }}</td><td>{% if item.is_active %}<span class="pill pill-success">Active</span>{% else %}<span class="pill pill-muted">Inactive</span>{% endif %}</td><td><div class="actions"><a class="btn btn-soft" href="{% url 'menu_item_edit' item.id %}">Edit</a><form method="post" action="{% url 'menu_item_delete' item.id %}" onsubmit="return confirm('Delete this menu item?');">{% csrf_token %}<button type="submit" class="btn-danger">Delete</button></form></div></td></tr>{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">No menu items found.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

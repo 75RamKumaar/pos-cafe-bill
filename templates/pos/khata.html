@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Khata | Cafe POS{% endblock %}
+{% block content %}
+<h2>Khata Accounts</h2>
+<p class="muted">Track credit sales and payments separately from today's sales.</p>
+
+{% for c in customers %}
+<div class="card">
+<div class="row">
+<div><h3>{{c.name}}</h3><span class="muted">{{c.phone}}</span></div>
+<div style="text-align:right"><small>Outstanding</small><h2>₹{{c.balance|floatformat:2}}</h2></div>
+</div>
+
+<form method="post" action="/khata/{{c.id}}/pay/" class="actions">
+{% csrf_token %}
+<input name="amount" type="number" min="0.01" step="0.01" placeholder="Payment amount" required>
+<input name="note" placeholder="Note (optional)">
+<button class="cash">Receive Payment</button>
+</form>
+</div>
+{% empty %}
+<div class="card">No customers yet.</div>
+{% endfor %}
+{% endblock %}
