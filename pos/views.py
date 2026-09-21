@@ -124,7 +124,7 @@ def bill_create(request):
         "bill_id": bill.id,
         "bill_number": bill.bill_number,
         "total": f"{bill.grand_total:.2f}",
-        "detail_url": bill.get_absolute_url() if hasattr(bill, "get_absolute_url") else f"/billing/{bill.id}/",
+        "detail_url": f"{bill.get_absolute_url() if hasattr(bill, 'get_absolute_url') else f'/billing/{bill.id}/'}?print=1",
     })
 
 
