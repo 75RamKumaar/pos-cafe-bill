@@ -1,4 +1,5 @@
 from decimal import Decimal
+from django.conf import settings
 from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
@@ -58,38 +59,6 @@ class Customer(models.Model):
         return self.name
 
 
-class Sale(models.Model):
-    CASH = "CASH"
-    UPI = "UPI"
-    KHATA = "KHATA"
-
-    PAYMENT_CHOICES = [
-        (CASH, "Cash"),
-        (UPI, "UPI"),
-        (KHATA, "Khata"),
-    ]
-
-    invoice_number = models.CharField(max_length=40, unique=True)
-    customer = models.ForeignKey(
-        Customer, null=True, blank=True, on_delete=models.SET_NULL
-    )
-    payment_mode = models.CharField(max_length=10, choices=PAYMENT_CHOICES)
-    total = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(default=timezone.now)
-
-    def __str__(self):
-        return self.invoice_number
-
-
-class SaleItem(models.Model):
-    sale = models.ForeignKey(Sale, related_name="items", on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.PROTECT)
-    quantity = models.DecimalField(max_digits=10, decimal_places=2)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
-    cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-
-
 class Bill(models.Model):
     CASH = "CASH"
     UPI = "UPI"
@@ -145,11 +114,13 @@ class KhataTransaction(models.Model):
     customer = models.ForeignKey(
         Customer, related_name="khata_transactions", on_delete=models.CASCADE
     )
-    sale = models.ForeignKey(Sale, null=True, blank=True, on_delete=models.SET_NULL)
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     note = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.customer} - {self.get_kind_display()} - {self.amount}"
 
 
 class Expense(models.Model):
@@ -168,6 +139,30 @@ class Expense(models.Model):
     @property
     def display_title(self):
         return self.title or self.description or self.category
+
+    def __str__(self):
+        return self.display_title
+
+
+class AuditLog(models.Model):
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pos_audit_logs",
+    )
+    action = models.CharField(max_length=50)
+    model_name = models.CharField(max_length=100)
+    object_repr = models.CharField(max_length=255)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    details = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.action} {self.model_name} {self.object_repr}"
 
 
 class BusinessSettings(models.Model):

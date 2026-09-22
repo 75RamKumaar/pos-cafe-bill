@@ -13,7 +13,6 @@ urlpatterns = [
     path("menu-items/add/", views.menu_item_create, name="menu_item_create"),
     path("menu-items/<int:item_id>/edit/", views.menu_item_edit, name="menu_item_edit"),
     path("menu-items/<int:item_id>/delete/", views.menu_item_delete, name="menu_item_delete"),
-    path("checkout/", views.checkout, name="checkout"),
     path("customers/", views.customers, name="customers"),
     path("customers/add/", views.customer_create, name="customer_create"),
     path("customers/<int:customer_id>/", views.customer_detail, name="customer_detail"),
@@ -29,4 +28,5 @@ urlpatterns = [
     path("reports/", views.reports, name="reports"),
     path("reports/export-sales/", views.export_sales_csv, name="export_sales_csv"),
     path("settings/", views.settings_page, name="settings"),
+    path("audit-logs/", views.audit_logs, name="audit_logs"),
 ]

@@ -2,37 +2,69 @@
 {% block title %}Billing | Cafe POS{% endblock %}
 {% block eyebrow %}Billing / New order{% endblock %}
 {% block content %}
-<div class="page-head">
-<div><h1>Billing</h1><p>Build a bill quickly from the active menu.</p><small class="muted">Keyboard shortcuts enabled - press a product key to add it</small></div>
-<a class="btn btn-outline" href="{% url 'billing_history' %}">▤ Billing History</a>
+<style>
+.billing-page{--billing-ink:#20252b;--billing-coral:#e85d3f;--billing-line:#e7eaed;--billing-muted:#74808a}
+.billing-head{align-items:center;margin-bottom:20px}.billing-head h1{font-size:30px;margin-bottom:4px}.billing-head p{margin:0}
+.billing-shortcut{display:flex;align-items:center;gap:10px;margin-top:14px}.billing-shortcut input{max-width:240px;height:48px;border:2px solid #ffd1c6;font-weight:700;letter-spacing:.04em}.billing-shortcut input:focus{border-color:var(--billing-coral);box-shadow:0 0 0 4px #fff0ec}.shortcut-hint{font-size:12px;color:var(--billing-muted)}
+.billing-layout{grid-template-columns:minmax(0,1fr) minmax(360px,410px);gap:20px;align-items:start}.menu-card{padding:20px;min-width:0;width:100%}.menu-toolbar{display:flex;gap:12px;align-items:center;margin-bottom:16px}.menu-toolbar input{height:48px;flex:1;min-width:0}.menu-count{white-space:nowrap}
+.category-tabs{gap:8px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px 18px;scrollbar-width:thin}.category-tab{min-height:44px;padding:9px 15px;border-radius:12px;border:1px solid var(--billing-line);font-size:14px;white-space:nowrap}.category-tab.active{background:var(--billing-coral);border-color:var(--billing-coral);color:#fff;box-shadow:0 5px 12px rgba(232,93,63,.2)}
+.billing-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px;min-width:0;width:100%}.billing-product{min-height:132px;width:100%;padding:16px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:14px;background:#fff;border:1px solid var(--billing-line);border-radius:14px;color:var(--billing-ink);cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}.billing-product:hover,.billing-product:focus-visible{border-color:var(--billing-coral);box-shadow:0 8px 20px rgba(232,93,63,.12);outline:none;transform:translateY(-2px)}.billing-product:active{transform:scale(.98)}.billing-product-name{font-size:16px;line-height:1.25;font-weight:800}.billing-product-meta{display:flex;align-items:center;justify-content:space-between;width:100%;gap:8px}.billing-product-price{font-size:18px;color:var(--billing-coral);font-weight:900}.billing-product-shortcut{padding:4px 7px;border-radius:7px;background:#f2f4f5;color:var(--billing-muted);font-size:11px;font-weight:800;letter-spacing:.04em}
+.billing-panel{position:sticky;top:20px;max-height:calc(100vh - 40px);overflow:auto}.cart-card{padding:20px;margin-bottom:0}.cart-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:15px;border-bottom:1px solid var(--billing-line)}.cart-header h2{font-size:20px;margin:0 0 4px}.cart-header p{margin:0;font-size:12px;color:var(--billing-muted)}.cart-clear{min-height:40px;padding:8px 12px}.cart-list{min-height:96px;max-height:34vh;overflow:auto;margin:4px 0 12px}.cart-empty{min-height:110px;display:grid;place-items:center;text-align:center;padding:22px 10px;color:var(--billing-muted);font-size:13px}.cart-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:14px 0;border-bottom:1px solid var(--billing-line)}.cart-item:last-child{border-bottom:0}.cart-item-name{font-size:14px;font-weight:800;line-height:1.3}.cart-item-price{display:block;color:var(--billing-muted);font-size:12px;margin-top:4px}.cart-item-total{text-align:right;font-size:14px;font-weight:900}.quantity-stepper{display:flex;align-items:center;gap:8px;margin-top:9px}.quantity-stepper button{width:44px;height:44px;padding:0;border-radius:10px;font-size:23px;background:#f2f4f5;color:var(--billing-ink)}.quantity-stepper button:hover{background:#fff0ec;color:var(--billing-coral)}.quantity-stepper strong{min-width:22px;text-align:center}.cart-remove{border:0;background:transparent;color:var(--billing-muted);font-size:11px;padding:4px 0;cursor:pointer}.cart-remove:hover{color:#c63d3d}.cart-summary{border-top:1px solid var(--billing-line);padding-top:10px}.summary-line{padding:5px 0}.discount-field{margin:12px 0}.discount-field input{height:44px}.grand-total{font-size:25px;padding:14px 0 4px;border-top:2px solid var(--billing-ink);margin-top:7px}.customer-suggestions{display:none;padding:6px;margin:6px 0 0;background:#fff;border:1px solid var(--billing-line);border-radius:10px}.customer-suggestions button{width:100%;min-height:42px;margin:2px 0;justify-content:flex-start}.payment-grid{gap:8px}.payment-option span{min-height:52px;display:grid;place-items:center;padding:10px 6px}.generate-bill{min-height:56px;font-size:16px;margin-top:4px}.billing-error{display:none;margin-top:12px}.mobile-total-dock{display:none}
+@media(max-width:1050px){.billing-layout{grid-template-columns:1fr}.billing-panel{position:sticky;top:20px;z-index:5;order:-1;max-height:none}.billing-products{grid-template-columns:repeat(auto-fill,minmax(155px,1fr))}}
+@media(max-width:780px){.billing-head{align-items:stretch}.billing-head .btn{width:100%}.billing-shortcut{align-items:stretch;flex-direction:column}.billing-shortcut input{max-width:none}.billing-layout{display:flex;flex-direction:column;gap:14px}.billing-panel{order:-1;position:relative;top:auto;z-index:auto;max-height:none;margin:0 -15px}.cart-card{border-radius:0 0 16px 16px;padding:15px;box-shadow:0 8px 20px rgba(32,37,43,.1)}.cart-list{max-height:27vh}.menu-card{padding:15px}.menu-toolbar{display:block}.menu-toolbar input{margin-top:10px}.menu-count{display:inline-flex;margin-top:10px}.billing-products{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.billing-product{min-height:122px;padding:13px}.billing-product-name{font-size:14px}.billing-product-price{font-size:16px}.mobile-total-dock{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;align-items:center;justify-content:space-between;gap:12px;padding:10px 15px;background:var(--billing-ink);color:#fff;box-shadow:0 -8px 22px rgba(32,37,43,.18)}.mobile-total-dock small{display:block;color:#b9c1c7}.mobile-total-dock strong{font-size:20px}.mobile-total-dock button{min-height:42px;background:var(--billing-coral)}.billing-page{padding-bottom:72px}}
+</style>
+<div class="billing-page">
+    <div class="page-head billing-head">
+        <div>
+            <h1>New bill</h1>
+            <p>Tap products to build the order. Your total stays visible while you work.</p>
+            <div class="billing-shortcut">
+                <label class="field-label" for="shortcutInput" style="margin:0">Quick add</label>
+                <input id="shortcutInput" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" placeholder="Code + Enter" aria-label="Product shortcut code">
+                <span id="shortcutFeedback" class="shortcut-hint">Type a product code, then press Enter</span>
+            </div>
+        </div>
+        <a class="btn btn-outline" href="{% url 'billing_history' %}">Billing history</a>
+    </div>
+
+    <div class="billing-layout">
+        <section class="card menu-card">
+            <div class="menu-toolbar">
+                <input id="productSearch" type="search" placeholder="Search menu" autocomplete="off" aria-label="Search menu products">
+                <span class="pill pill-success menu-count">{{ products|length }} active items</span>
+            </div>
+            <div class="category-tabs" id="categoryTabs" role="tablist" aria-label="Product categories">
+                <button type="button" class="category-tab active" data-category="all" role="tab">All items</button>
+                {% for category in categories %}<button type="button" class="category-tab" data-category="{{ category|escapejs }}" role="tab">{% if category %}{{ category }}{% else %}Uncategorized{% endif %}</button>{% endfor %}
+            </div>
+            <div class="billing-products" id="productGrid">
+                {% for product in products %}
+                <button type="button" class="billing-product" data-id="{{ product.id }}" data-name="{{ product.name|escapejs }}" data-price="{{ product.price }}" data-category="{{ product.category|escapejs }}" data-shortcut="{{ product.shortcut_key|escapejs }}" onclick="addItem({{ product.id }})">
+                    <span class="billing-product-name">{{ product.name }}</span>
+                    <span class="billing-product-meta"><span class="billing-product-price">₹{{ product.price|floatformat:2 }}</span>{% if product.shortcut_key %}<span class="billing-product-shortcut">{{ product.shortcut_key }}</span>{% endif %}</span>
+                </button>
+                {% empty %}<div class="cart-empty">No active menu items. Add one from Menu Items.</div>{% endfor %}
+            </div>
+        </section>
+
+        <aside class="billing-panel" id="cartPanel">
+            <div class="card cart-card">
+                <div class="cart-header"><div><h2>Current bill <span class="pill pill-muted" id="cartCount">0 items</span></h2><p>Adjust quantities before generating the bill.</p></div><button type="button" class="btn btn-soft cart-clear" onclick="clearCart()">Clear</button></div>
+                <div class="cart-list" id="cart"><div class="cart-empty">Your bill is empty.<br>Choose items from the menu.</div></div>
+                <div class="cart-summary">
+                    <div class="summary-line"><span>Subtotal</span><b>₹<span id="subtotal">0.00</span></b></div>
+                    <div class="field discount-field"><label class="field-label" for="discount">Discount</label><input id="discount" type="number" min="0" step="0.01" value="0" placeholder="0.00" oninput="renderCart()"></div>
+                    <div class="grand-total summary-line"><span>Total</span><b>₹<span id="grandTotal">0.00</span></b></div>
+                </div>
+                <div class="field" style="margin-top:16px"><label class="field-label" for="customerSearch">Customer <span class="muted">(optional)</span></label><input id="customerSearch" type="search" placeholder="Name or phone" autocomplete="off"><input id="customer" type="hidden"><div id="customerSuggestions" class="customer-suggestions"></div><small id="selectedCustomer" class="muted">Walk-in customer</small></div>
+                <div class="field"><span class="field-label">Payment method</span><div class="payment-grid">{% for value,label in payment_methods %}<label class="payment-option"><input type="radio" name="payment_method" value="{{ value }}"{% if forloop.first %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div></div>
+                <div id="billingError" class="alert alert-error billing-error"></div>
+                <button type="button" id="generateBillButton" class="btn btn-primary generate-bill" onclick="saveBill()">Generate bill</button>
+            </div>
+        </aside>
+    </div>
 </div>
-<div class="billing-layout">
-<section>
-<div class="card">
-<div class="row" style="padding-top:0"><div><h3 style="margin-bottom:4px">Menu</h3><span class="muted">Tap an item to add it to the bill</span></div><span class="pill pill-success">{{ products|length }} active items</span></div>
-<div class="field"><label class="field-label" for="productSearch">Search products</label><input id="productSearch" type="search" placeholder="Search by product name" autocomplete="off"></div>
-<div class="category-tabs" id="categoryTabs"><button type="button" class="category-tab active" data-category="all">All items</button>{% for category in categories %}<button type="button" class="category-tab" data-category="{{ category|escapejs }}">{{ category }}</button>{% endfor %}</div>
-<div class="products" id="productGrid">
-{% for product in products %}
-<button type="button" class="product" data-id="{{ product.id }}" data-name="{{ product.name|escapejs }}" data-price="{{ product.price }}" data-category="{{ product.category|escapejs }}" data-shortcut="{{ product.shortcut_key|escapejs }}" onclick="addItem({{ product.id }})"><b>{% if product.shortcut_key %}<span class="pill pill-muted">[{{ product.shortcut_key }}]</span> {% endif %}{{ product.name }}</b><span>₹{{ product.price|floatformat:2 }}</span>{% if product.category %}<small>{{ product.category }}</small>{% endif %}</button>
-{% empty %}<div class="cart-empty">No active menu items. Add one from Menu Items.</div>{% endfor %}
-</div>
-</div>
-</section>
-<section class="billing-panel">
-<div class="card">
-<div class="row" style="padding-top:0"><div><h3 style="margin-bottom:4px">Current Bill</h3><span class="muted">Bill number generated when you generate the bill</span></div><button type="button" class="btn-soft" onclick="clearCart()">Clear</button></div>
-<div id="cart"><div class="cart-empty">Your bill is empty.<br>Choose items from the menu.</div></div>
-<div class="summary-line"><span>Subtotal</span><b>₹<span id="subtotal">0.00</span></b></div>
-<div class="field" style="margin:12px 0"><label class="field-label" for="discount">Discount</label><input id="discount" type="number" min="0" step="0.01" value="0" placeholder="0.00" oninput="renderCart()"></div>
-<div class="grand-total summary-line"><span>Total</span><b>₹<span id="grandTotal">0.00</span></b></div>
-<div class="field" style="margin-top:16px"><label class="field-label" for="customerSearch">Customer <span class="muted">(optional)</span></label><input id="customerSearch" type="search" placeholder="Search customer by name or phone" autocomplete="off"><input id="customer" type="hidden"><div id="customerSuggestions" class="card" style="display:none;padding:6px;margin:6px 0 0"></div><small id="selectedCustomer" class="muted">Walk-in customer</small></div>
-<div class="field"><span class="field-label">Payment method</span><div class="payment-grid">{% for value,label in payment_methods %}<label class="payment-option"><input type="radio" name="payment_method" value="{{ value }}"{% if forloop.first %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div></div>
-<div id="billingError" class="alert alert-error" style="display:none"></div>
-<button type="button" id="generateBillButton" class="btn btn-primary" style="width:100%" onclick="saveBill()">✓ Generate Bill</button>
-</div>
-</section>
-</div>
+<div class="mobile-total-dock"><div><small><span id="mobileDockCount">0 items</span> in bill</small><strong>₹<span id="mobileDockTotal">0.00</span></strong></div><button type="button" onclick="document.getElementById('cartPanel').scrollIntoView({behavior:'smooth'})">View bill</button></div>
 <form style="display:none">{% csrf_token %}</form>
 <script>
 const cart = new Map();
@@ -41,46 +73,26 @@ const shortcutProducts = {};
 let shortcutBuffer = "";
 let shortcutTimer = null;
 let selectedCartId = null;
-document.querySelectorAll(".product").forEach((button) => { const product={id:Number(button.dataset.id), name:button.dataset.name, price:Number(button.dataset.price), category:button.dataset.category}; products[button.dataset.id] = product; if(button.dataset.shortcut)shortcutProducts[button.dataset.shortcut]=product; });
-function addItem(id){ const product=products[id]; if(!product)return; const key=String(id); const current=cart.get(key)||{...product,quantity:0}; current.quantity++; cart.set(key,current); selectedCartId=key; renderCart(); }
-function changeQuantity(id,delta){ const item=cart.get(String(id)); if(!item)return; item.quantity+=delta; if(item.quantity<=0)cart.delete(String(id)); selectedCartId=String(id); renderCart(); }
+document.querySelectorAll(".billing-product").forEach((button) => { const product={id:Number(button.dataset.id), name:button.dataset.name, price:Number(button.dataset.price), category:button.dataset.category}; products[button.dataset.id]=product; if(button.dataset.shortcut)shortcutProducts[button.dataset.shortcut.toUpperCase()]=product; });
+function addItem(id){const product=products[id];if(!product)return;const key=String(id);const current=cart.get(key)||{...product,quantity:0};current.quantity++;cart.set(key,current);selectedCartId=key;renderCart();}
+function changeQuantity(id,delta){const item=cart.get(String(id));if(!item)return;item.quantity+=delta;if(item.quantity<=0)cart.delete(String(id));selectedCartId=String(id);renderCart();}
 function removeItem(id){cart.delete(String(id));if(selectedCartId===String(id))selectedCartId=null;renderCart();}
-function clearCart(){cart.clear();document.getElementById("discount").value="0";renderCart();}
-function renderCart(){
- const cartEl=document.getElementById("cart"); let subtotal=0;
- if(!cart.size){cartEl.innerHTML='<div class="cart-empty">Your bill is empty.<br>Choose items from the menu.</div>';}
- else {cartEl.innerHTML=[...cart.values()].map(item=>{const total=item.price*item.quantity;subtotal+=total;return `<div class="cart-line${selectedCartId===String(item.id)?"" : ""}" onclick="selectedCartId='${item.id}'"><div><b>${escapeHtml(item.name)}</b><br><small class="muted">₹${item.price.toFixed(2)} each</small></div><div class="qty-control"><button type="button" onclick="event.stopPropagation();changeQuantity(${item.id},-1)">−</button><b>${item.quantity}</b><button type="button" onclick="event.stopPropagation();changeQuantity(${item.id},1)">+</button></div><div style="text-align:right"><b>₹${total.toFixed(2)}</b><br><button type="button" class="btn-soft" style="padding:4px 7px;font-size:11px;margin-top:4px" onclick="event.stopPropagation();removeItem(${item.id})">Remove</button></div></div>`}).join("");}
- if(!cart.size)subtotal=0; const discount=Math.max(0,Number(document.getElementById("discount").value)||0); document.getElementById("subtotal").textContent=subtotal.toFixed(2); document.getElementById("grandTotal").textContent=Math.max(0,subtotal-discount).toFixed(2);
-}
+function clearCart(){cart.clear();document.getElementById("discount").value="0";selectedCartId=null;renderCart();}
+function renderCart(){const cartEl=document.getElementById("cart");let subtotal=0;let count=0;if(!cart.size){cartEl.innerHTML='<div class="cart-empty">Your bill is empty.<br>Choose items from the menu.</div>';}else{cartEl.innerHTML=[...cart.values()].map(item=>{const total=item.price*item.quantity;subtotal+=total;count+=item.quantity;return `<div class="cart-item"><div><div class="cart-item-name">${escapeHtml(item.name)}</div><span class="cart-item-price">₹${item.price.toFixed(2)} each</span><div class="quantity-stepper"><button type="button" aria-label="Decrease ${escapeHtml(item.name)} quantity" onclick="changeQuantity(${item.id},-1)">-</button><strong>${item.quantity}</strong><button type="button" aria-label="Increase ${escapeHtml(item.name)} quantity" onclick="changeQuantity(${item.id},1)">+</button><button type="button" class="cart-remove" onclick="removeItem(${item.id})">Remove</button></div></div><div class="cart-item-total">₹${total.toFixed(2)}</div></div>`}).join("");}if(!cart.size)subtotal=0;const discount=Math.max(0,Number(document.getElementById("discount").value)||0);const total=Math.max(0,subtotal-discount);document.getElementById("subtotal").textContent=subtotal.toFixed(2);document.getElementById("grandTotal").textContent=total.toFixed(2);document.getElementById("cartCount").textContent=`${count} item${count===1?"":"s"}`;document.getElementById("mobileDockCount").textContent=`${count} item${count===1?"":"s"}`;document.getElementById("mobileDockTotal").textContent=total.toFixed(2);}
 function escapeHtml(value){return value.replace(/[&<>'"]/g,(character)=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));}
 function getCookie(name){const row=document.cookie.split("; ").find((part)=>part.startsWith(name+"="));return row?decodeURIComponent(row.split("=")[1]):"";}
-async function saveBill(){
- const error=document.getElementById("billingError"); error.style.display="none";
- if(!cart.size){error.textContent="Add at least one item before saving.";error.style.display="block";return;}
- const generateButton=document.getElementById("generateBillButton"); generateButton.disabled=true; generateButton.textContent="Generating Bill...";
- const payment=document.querySelector('input[name="payment_method"]:checked'); const payload={items:[...cart.values()].map(item=>({id:item.id,quantity:item.quantity})),discount:document.getElementById("discount").value||"0",customer_id:document.getElementById("customer").value||null,payment_method:payment?payment.value:""};
- const response=await fetch("{% url 'bill_create' %}",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":getCookie("csrftoken")},body:JSON.stringify(payload)}); const data=await response.json();
- if(!response.ok){error.textContent=data.error||"Unable to generate this bill.";error.style.display="block";generateButton.disabled=false;generateButton.textContent="✓ Generate Bill";return;}
- window.location.href=data.detail_url;
-}
-const customerSearch=document.getElementById("customerSearch"); const customerSuggestions=document.getElementById("customerSuggestions");
-customerSearch.addEventListener("input",async()=>{const query=customerSearch.value.trim();document.getElementById("customer").value="";document.getElementById("selectedCustomer").textContent="Walk-in customer";if(!query){customerSuggestions.style.display="none";return;}const response=await fetch(`{% url 'customer_search' %}?q=${encodeURIComponent(query)}`);const data=await response.json();customerSuggestions.innerHTML=data.customers.length?data.customers.map(customer=>`<button type="button" class="btn btn-outline" style="width:100%;margin:2px 0;justify-content:flex-start" onclick="selectCustomer(${customer.id},'${escapeHtml(customer.name)}')">${escapeHtml(customer.name)}${customer.phone?` · ${escapeHtml(customer.phone)}`:""}</button>`).join(""):"<span class='muted'>No matching customer</span>";customerSuggestions.style.display="block";});
+function showShortcutFeedback(message,isError=false){const feedback=document.getElementById("shortcutFeedback");feedback.textContent=message;feedback.style.color=isError?"#c63d3d":"";}
+function addShortcutCode(code){const product=shortcutProducts[code.trim().toUpperCase()];if(!product){showShortcutFeedback(`No product for ${code.trim()||"that code"}`,true);return false;}addItem(product.id);showShortcutFeedback(`Added ${product.name}`);return true;}
+async function saveBill(){const error=document.getElementById("billingError");error.style.display="none";if(!cart.size){error.textContent="Add at least one item before saving.";error.style.display="block";return;}const generateButton=document.getElementById("generateBillButton");generateButton.disabled=true;generateButton.classList.add("loading");generateButton.textContent="Generating bill...";const payment=document.querySelector('input[name="payment_method"]:checked');const payload={items:[...cart.values()].map(item=>({id:item.id,quantity:item.quantity})),discount:document.getElementById("discount").value||"0",customer_id:document.getElementById("customer").value||null,payment_method:payment?payment.value:""};try{const response=await fetch("{% url 'bill_create' %}",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":getCookie("csrftoken")},body:JSON.stringify(payload)});const data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to generate this bill.");window.location.href=data.detail_url;}catch(requestError){error.textContent=requestError.message;error.style.display="block";generateButton.disabled=false;generateButton.classList.remove("loading");generateButton.textContent="Generate bill";}}
+const shortcutInput=document.getElementById("shortcutInput");shortcutInput.addEventListener("keydown",(event)=>{if(event.key!=="Enter")return;event.preventDefault();const code=shortcutInput.value;addShortcutCode(code);shortcutInput.value="";});
+const customerSearch=document.getElementById("customerSearch");const customerSuggestions=document.getElementById("customerSuggestions");customerSearch.addEventListener("input",async()=>{const query=customerSearch.value.trim();document.getElementById("customer").value="";document.getElementById("selectedCustomer").textContent="Walk-in customer";if(!query){customerSuggestions.style.display="none";return;}customerSuggestions.innerHTML='<span class="loading-inline">Searching customers...</span>';customerSuggestions.style.display="block";try{const response=await fetch(`{% url 'customer_search' %}?q=${encodeURIComponent(query)}`);if(!response.ok)throw new Error("Search unavailable");const data=await response.json();customerSuggestions.innerHTML=data.customers.length?data.customers.map(customer=>`<button type="button" class="btn btn-outline" onclick="selectCustomer(${customer.id},'${escapeHtml(customer.name)}')">${escapeHtml(customer.name)}${customer.phone?` - ${escapeHtml(customer.phone)}`:""}</button>`).join(""):"<span class='muted'>No matching customer</span>";}catch(searchError){customerSuggestions.innerHTML='<span class="muted">Customer search unavailable.</span>';}});
 function selectCustomer(id,name){document.getElementById("customer").value=id;document.getElementById("customerSearch").value=name;document.getElementById("selectedCustomer").textContent=`Selected: ${name}`;customerSuggestions.style.display="none";}
-document.querySelectorAll(".category-tab").forEach((tab)=>tab.addEventListener("click",()=>{document.querySelectorAll(".category-tab").forEach((item)=>item.classList.remove("active"));tab.classList.add("active");const category=tab.dataset.category;document.querySelectorAll(".product").forEach((item)=>{item.style.display=category==="all"||item.dataset.category===category?"block":"none";});}));
-document.getElementById("productSearch").addEventListener("input",(event)=>{const query=event.target.value.trim().toLowerCase();document.querySelectorAll(".product").forEach((item)=>{item.style.display=item.dataset.name.toLowerCase().includes(query)?"block":"none";});});
+function filterProducts(){const query=document.getElementById("productSearch").value.trim().toLowerCase();const category=document.querySelector(".category-tab.active").dataset.category;document.querySelectorAll(".billing-product").forEach((item)=>{const matchesCategory=category==="all"||item.dataset.category===category;const matchesQuery=!query||item.dataset.name.toLowerCase().includes(query);item.style.display=matchesCategory&&matchesQuery?"flex":"none";});}
+document.querySelectorAll(".category-tab").forEach((tab)=>tab.addEventListener("click",()=>{document.querySelectorAll(".category-tab").forEach((item)=>item.classList.remove("active"));tab.classList.add("active");filterProducts();}));document.getElementById("productSearch").addEventListener("input",filterProducts);
 function clearShortcutBuffer(){shortcutBuffer="";if(shortcutTimer){clearTimeout(shortcutTimer);shortcutTimer=null;}}
-function commitShortcut(){const product=shortcutProducts[shortcutBuffer];clearShortcutBuffer();if(product)addItem(product.id);}
-function handleShortcutDigit(digit){
- handleShortcutCharacter(digit);
-}
-function handleShortcutCharacter(character){
- const candidate=shortcutBuffer+character;
- if(shortcutBuffer && shortcutProducts[candidate]){shortcutBuffer=candidate;commitShortcut();return;}
- if(shortcutBuffer && shortcutProducts[shortcutBuffer]){commitShortcut();shortcutBuffer=character;shortcutTimer=setTimeout(commitShortcut,500);return;}
- if(shortcutBuffer)clearShortcutBuffer();
- shortcutBuffer=character;shortcutTimer=setTimeout(commitShortcut,500);
-}
-document.addEventListener("keydown",(event)=>{const target=event.target;const isFormField=target.matches("input, textarea, select, [contenteditable='true']");if(isFormField)return;if(event.ctrlKey&&event.key==="Enter"){event.preventDefault();saveBill();return;}if(event.key==="Escape"){clearShortcutBuffer();return;}if(event.key==="Delete"&&selectedCartId){removeItem(selectedCartId);return;}if(event.key==="+"&&selectedCartId){changeQuantity(selectedCartId,1);return;}if(event.key==="-"&&selectedCartId){changeQuantity(selectedCartId,-1);return;}if(!/^[a-zA-Z0-9]$/.test(event.key))return;handleShortcutCharacter(event.key.toUpperCase());});
-renderCart();
+function commitShortcut(){const code=shortcutBuffer;clearShortcutBuffer();if(code)addShortcutCode(code);}
+function handleShortcutCharacter(character){const candidate=shortcutBuffer+character;if(shortcutBuffer&&shortcutProducts[candidate]){shortcutBuffer=candidate;commitShortcut();return;}if(shortcutBuffer&&shortcutProducts[shortcutBuffer]){commitShortcut();shortcutBuffer=character;shortcutTimer=setTimeout(commitShortcut,500);return;}if(shortcutBuffer)clearShortcutBuffer();shortcutBuffer=character;shortcutTimer=setTimeout(commitShortcut,500);}
+document.addEventListener("keydown",(event)=>{const target=event.target;if(target.matches("input, textarea, select, [contenteditable='true']"))return;if(event.ctrlKey&&event.key==="Enter"){event.preventDefault();saveBill();return;}if(event.key==="Escape"){clearShortcutBuffer();return;}if(event.key==="Delete"&&selectedCartId){removeItem(selectedCartId);return;}if(event.key==="+"&&selectedCartId){changeQuantity(selectedCartId,1);return;}if(event.key==="-"&&selectedCartId){changeQuantity(selectedCartId,-1);return;}if(/^[a-zA-Z0-9]$/.test(event.key))handleShortcutCharacter(event.key.toUpperCase());});
+renderCart();shortcutInput.focus();
 </script>
 {% endblock %}

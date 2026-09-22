@@ -1,13 +1,20 @@
+import base64
 import csv
 import json
+from functools import wraps
 from datetime import datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponseForbidden
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+import qrcode
 from django.utils import timezone
 from django.db.models.deletion import ProtectedError
 
@@ -18,17 +25,34 @@ from .models import (
     Customer,
     Expense,
     KhataTransaction,
+    AuditLog,
     Product,
-    Sale,
-    SaleItem,
     BusinessSettings,
 )
 
 
+def role_required(*group_names):
+    def decorator(view):
+        @login_required
+        @wraps(view)
+        def wrapped(request, *args, **kwargs):
+            if request.user.is_superuser or request.user.groups.filter(
+                name__in=group_names
+            ).exists():
+                return view(request, *args, **kwargs)
+            return HttpResponseForbidden("You do not have permission to access this page.")
+
+        return wrapped
+
+    return decorator
+
+
+@role_required("Cashier", "Owner")
 def pos(request):
     return redirect("billing")
 
 
+@role_required("Cashier", "Owner")
 def billing(request):
     products = Product.objects.filter(is_active=True)
     categories = products.values_list("category", flat=True).distinct().order_by("category")
@@ -41,6 +65,7 @@ def billing(request):
     })
 
 
+@role_required("Cashier", "Owner")
 def customer_search(request):
     query = request.GET.get("q", "").strip()
     customers = Customer.objects.all()
@@ -49,6 +74,7 @@ def customer_search(request):
     return JsonResponse({"customers": [{"id": c.id, "name": c.name, "phone": c.phone} for c in customers[:10]]})
 
 
+@role_required("Cashier", "Owner")
 def bill_create(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
@@ -128,6 +154,7 @@ def bill_create(request):
     })
 
 
+@role_required("Cashier", "Owner")
 def billing_history(request):
     query = request.GET.get("q", "").strip()
     date = request.GET.get("date", "").strip()
@@ -143,18 +170,48 @@ def billing_history(request):
     })
 
 
+@role_required("Cashier", "Owner")
 def bill_detail(request, bill_id):
     bill = get_object_or_404(Bill.objects.select_related("customer").prefetch_related("items"), pk=bill_id)
-    return render(request, "pos/bill_detail.html", {"bill": bill, "business_settings": BusinessSettings.current(), "auto_print": request.GET.get("print") == "1"})
+    mode = request.GET.get("mode", "a4").lower()
+    if mode not in {"a4", "thermal", "thermal58"}:
+        mode = "a4"
+    digital_url = request.build_absolute_uri(reverse("bill_detail", args=[bill.id]))
+    qr_image = qrcode.make(digital_url)
+    qr_output = BytesIO()
+    qr_image.save(qr_output, format="PNG")
+    qr_data_uri = "data:image/png;base64," + base64.b64encode(qr_output.getvalue()).decode("ascii")
+    return render(request, "pos/bill_detail.html", {
+        "bill": bill,
+        "business_settings": BusinessSettings.current(),
+        "auto_print": request.GET.get("print") == "1",
+        "receipt_mode": mode,
+        "digital_url": digital_url,
+        "qr_data_uri": qr_data_uri,
+    })
 
 
+@role_required("Owner")
 def bill_delete(request, bill_id):
     if request.method == "POST":
-        get_object_or_404(Bill, pk=bill_id).delete()
+        with transaction.atomic():
+            bill = get_object_or_404(Bill.objects.prefetch_related("items__menu_item"), pk=bill_id)
+            for item in bill.items.all():
+                product = item.menu_item
+                product.stock += item.quantity
+                product.save(update_fields=["stock"])
+            log_audit(
+                request,
+                "DELETE",
+                bill,
+                {"grand_total": str(bill.grand_total), "restored_items": bill.items.count()},
+            )
+            bill.delete()
         messages.success(request, "Bill deleted.")
     return redirect("billing_history")
 
 
+@role_required("Owner")
 def menu_items(request):
     query = request.GET.get("q", "").strip()
     category = request.GET.get("category", "").strip()
@@ -175,6 +232,7 @@ def menu_items(request):
     })
 
 
+@role_required("Owner")
 def menu_item_create(request):
     form = MenuItemForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
@@ -188,6 +246,7 @@ def menu_item_create(request):
     })
 
 
+@role_required("Owner")
 def menu_item_edit(request, item_id):
     item = get_object_or_404(Product, pk=item_id)
     form = MenuItemForm(request.POST or None, request.FILES or None, instance=item)
@@ -203,6 +262,7 @@ def menu_item_edit(request, item_id):
     })
 
 
+@role_required("Owner")
 def menu_item_delete(request, item_id):
     if request.method != "POST":
         return redirect("menu_items")
@@ -219,92 +279,14 @@ def menu_item_delete(request, item_id):
     return redirect("menu_items")
 
 
-@transaction.atomic
-def checkout(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "POST required"}, status=405)
-
-    try:
-        data = json.loads(request.body)
-        items = data.get("items", [])
-        payment_mode = data.get("payment_mode")
-        customer_id = data.get("customer_id")
-    except (json.JSONDecodeError, AttributeError):
-        return JsonResponse({"error": "Invalid request"}, status=400)
-
-    if not items:
-        return JsonResponse({"error": "Add at least one item"}, status=400)
-
-    if payment_mode not in dict(Sale.PAYMENT_CHOICES):
-        return JsonResponse({"error": "Invalid payment mode"}, status=400)
-
-    customer = None
-    if payment_mode == Sale.KHATA:
-        if not customer_id:
-            return JsonResponse({"error": "Select a Khata customer"}, status=400)
-        customer = get_object_or_404(Customer, pk=customer_id)
-
-    total = Decimal("0")
-    validated_items = []
-
-    for raw in items:
-        try:
-            product = Product.objects.get(pk=int(raw["id"]), is_active=True)
-            quantity = Decimal(str(raw["quantity"]))
-        except (KeyError, ValueError, InvalidOperation, Product.DoesNotExist):
-            return JsonResponse({"error": "Invalid product or quantity"}, status=400)
-
-        if quantity <= 0:
-            return JsonResponse({"error": "Quantity must be positive"}, status=400)
-
-        amount = product.price * quantity
-        total += amount
-        validated_items.append((product, quantity, amount))
-
-    invoice = f"INV-{timezone.now():%Y%m%d%H%M%S%f}"
-
-    sale = Sale.objects.create(
-        invoice_number=invoice,
-        customer=customer,
-        payment_mode=payment_mode,
-        total=total,
-    )
-
-    for product, quantity, amount in validated_items:
-        SaleItem.objects.create(
-            sale=sale,
-            product=product,
-            quantity=quantity,
-            unit_price=product.price,
-            cost_price=product.cost_price,
-            amount=amount,
-        )
-        product.stock = max(Decimal("0"), product.stock - quantity)
-        product.save(update_fields=["stock"])
-
-    if payment_mode == Sale.KHATA:
-        KhataTransaction.objects.create(
-            customer=customer,
-            sale=sale,
-            kind=KhataTransaction.CREDIT,
-            amount=total,
-            note=f"Invoice {invoice}",
-        )
-
-    return JsonResponse({
-        "ok": True,
-        "invoice": invoice,
-        "total": f"{total:.2f}",
-        "payment_mode": payment_mode,
-    })
-
-
+@role_required("Cashier", "Owner")
 def khata(request):
     return render(request, "pos/khata.html", {
         "customers": Customer.objects.all(),
     })
 
 
+@role_required("Cashier", "Owner")
 def customers(request):
     query = request.GET.get("q", "").strip()
     customer_list = Customer.objects.all()
@@ -313,6 +295,7 @@ def customers(request):
     return render(request, "pos/customers.html", {"customers": customer_list, "query": query})
 
 
+@role_required("Cashier", "Owner")
 def customer_create(request):
     form = CustomerForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -322,6 +305,7 @@ def customer_create(request):
     return render(request, "pos/customer_form.html", {"form": form, "page_title": "Add Customer", "submit_label": "Add Customer"})
 
 
+@role_required("Cashier", "Owner")
 def customer_detail(request, customer_id):
     customer = get_object_or_404(Customer, pk=customer_id)
     bills = customer.bills.all()
@@ -333,6 +317,7 @@ def customer_detail(request, customer_id):
     })
 
 
+@role_required("Owner")
 def customer_edit(request, customer_id):
     customer = get_object_or_404(Customer, pk=customer_id)
     form = CustomerForm(request.POST or None, instance=customer)
@@ -343,13 +328,17 @@ def customer_edit(request, customer_id):
     return render(request, "pos/customer_form.html", {"form": form, "customer": customer, "page_title": "Edit Customer", "submit_label": "Save Changes"})
 
 
+@role_required("Owner")
 def customer_delete(request, customer_id):
     if request.method == "POST":
-        get_object_or_404(Customer, pk=customer_id).delete()
+        customer = get_object_or_404(Customer, pk=customer_id)
+        log_audit(request, "DELETE", customer, {"phone": customer.phone})
+        customer.delete()
         messages.success(request, "Customer deleted.")
     return redirect("customers")
 
 
+@role_required("Cashier", "Owner")
 @transaction.atomic
 def khata_payment(request, customer_id):
     customer = get_object_or_404(Customer, pk=customer_id)
@@ -361,16 +350,23 @@ def khata_payment(request, customer_id):
             amount = Decimal("0")
 
         if amount > 0:
-            KhataTransaction.objects.create(
+            payment = KhataTransaction.objects.create(
                 customer=customer,
                 kind=KhataTransaction.PAYMENT,
                 amount=amount,
                 note=request.POST.get("note", "Payment received"),
             )
+            log_audit(
+                request,
+                "PAYMENT",
+                payment,
+                {"customer": customer.name, "amount": str(amount), "note": payment.note},
+            )
 
     return redirect("khata")
 
 
+@role_required("Owner")
 def expenses(request):
     query = request.GET.get("q", "").strip()
     category = request.GET.get("category", "").strip()
@@ -393,6 +389,7 @@ def expenses(request):
     })
 
 
+@role_required("Owner")
 def expense_create(request):
     form = ExpenseForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -402,6 +399,7 @@ def expense_create(request):
     return render(request, "pos/expense_form.html", {"form": form, "page_title": "Add Expense", "submit_label": "Add Expense"})
 
 
+@role_required("Owner")
 def expense_edit(request, expense_id):
     expense = get_object_or_404(Expense, pk=expense_id)
     form = ExpenseForm(request.POST or None, instance=expense)
@@ -412,13 +410,17 @@ def expense_edit(request, expense_id):
     return render(request, "pos/expense_form.html", {"form": form, "expense": expense, "page_title": "Edit Expense", "submit_label": "Save Changes"})
 
 
+@role_required("Owner")
 def expense_delete(request, expense_id):
     if request.method == "POST":
-        get_object_or_404(Expense, pk=expense_id).delete()
+        expense = get_object_or_404(Expense, pk=expense_id)
+        log_audit(request, "DELETE", expense, {"amount": str(expense.amount)})
+        expense.delete()
         messages.success(request, "Expense deleted.")
     return redirect("expenses")
 
 
+@role_required("Owner")
 def dashboard(request):
     today = timezone.localdate()
     start_at = timezone.make_aware(datetime.combine(today, time.min))
@@ -444,6 +446,7 @@ def dashboard(request):
     })
 
 
+@role_required("Owner")
 def reports(request):
     from_date, to_date, date_error = report_date_range(request)
     bills = report_bills(from_date, to_date)
@@ -498,6 +501,7 @@ def report_context(bills, from_date, to_date):
     }
 
 
+@role_required("Owner")
 def export_sales_csv(request):
     from_date, to_date, date_error = report_date_range(request)
     if date_error:
@@ -542,6 +546,7 @@ def render_csv_response(filename):
     return response
 
 
+@role_required("Owner")
 def settings_page(request):
     settings = BusinessSettings.current()
     form = BusinessSettingsForm(request.POST or None, instance=settings)
@@ -550,3 +555,20 @@ def settings_page(request):
         messages.success(request, "Business settings saved successfully.")
         return redirect("settings")
     return render(request, "pos/settings.html", {"form": form, "business_settings": settings})
+
+
+def log_audit(request, action, instance, details=None):
+    actor = request.user if request.user.is_authenticated else None
+    return AuditLog.objects.create(
+        actor=actor,
+        action=action,
+        model_name=instance.__class__.__name__,
+        object_repr=str(instance),
+        details=details or {},
+    )
+
+
+@role_required("Owner")
+def audit_logs(request):
+    logs = AuditLog.objects.select_related("actor")
+    return render(request, "pos/audit_logs.html", {"logs": logs})

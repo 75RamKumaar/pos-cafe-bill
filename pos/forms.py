@@ -1,9 +1,16 @@
 from decimal import Decimal
+from io import BytesIO
 import re
 
 from django import forms
+from django.core.files.base import ContentFile
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .models import BusinessSettings, Customer, Expense, Product
+
+
+MAX_IMAGE_SIZE = 3 * 1024 * 1024
+MAX_IMAGE_DIMENSION = 800
 
 
 class MenuItemForm(forms.ModelForm):
@@ -48,10 +55,51 @@ class MenuItemForm(forms.ModelForm):
 
     def clean_image(self):
         image = self.cleaned_data.get("image")
-        content_type = getattr(image, "content_type", None)
-        if content_type and content_type.split("/")[0] != "image":
+        if not image or not getattr(image, "file", None):
+            return image
+        if image.size > MAX_IMAGE_SIZE:
+            raise forms.ValidationError("Image files must be 3 MB or smaller.")
+
+        try:
+            image.file.seek(0)
+            with Image.open(image.file) as opened_image:
+                opened_image.verify()
+        except (Image.DecompressionBombError, UnidentifiedImageError, OSError):
             raise forms.ValidationError("Upload a valid image file.")
+        finally:
+            image.file.seek(0)
         return image
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        uploaded_image = self.files.get("image")
+        if uploaded_image:
+            uploaded_image.file.seek(0)
+            with Image.open(uploaded_image.file) as opened_image:
+                image_format = opened_image.format or "PNG"
+                processed_image = ImageOps.exif_transpose(opened_image)
+                processed_image.thumbnail(
+                    (MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION),
+                    Image.Resampling.LANCZOS,
+                )
+                if image_format == "JPEG" and processed_image.mode not in {"RGB", "L"}:
+                    processed_image = processed_image.convert("RGB")
+
+                output = BytesIO()
+                save_options = {"format": image_format}
+                if image_format == "JPEG":
+                    save_options.update(quality=90, optimize=True)
+                processed_image.save(output, **save_options)
+
+            instance.image.save(
+                uploaded_image.name,
+                ContentFile(output.getvalue()),
+                save=False,
+            )
+
+        if commit:
+            instance.save()
+        return instance
 
 
 class CustomerForm(forms.ModelForm):

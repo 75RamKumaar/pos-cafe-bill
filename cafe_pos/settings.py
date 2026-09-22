@@ -1,11 +1,18 @@
 from pathlib import Path
 
+from decouple import Csv, config
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = "django-insecure-cafe-pos-change-in-production"
-DEBUG = True
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+SECRET_KEY = config("DJANGO_SECRET_KEY")
+DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
+ALLOWED_HOSTS = config(
+    "DJANGO_ALLOWED_HOSTS",
+    default="127.0.0.1,localhost",
+    cast=Csv(),
+)
 
 INSTALLED_APPS = [
+    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -31,8 +38,10 @@ TEMPLATES = [{
     "APP_DIRS": True,
     "OPTIONS": {"context_processors": [
         "django.template.context_processors.request",
+            "django.template.context_processors.csrf",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
+            "pos.context_processors.roles",
     ]},
 }]
 
@@ -54,3 +63,6 @@ STATIC_URL = "static/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "billing"
+LOGOUT_REDIRECT_URL = "login"
