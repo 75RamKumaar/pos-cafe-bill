@@ -1,8 +1,25 @@
 {% extends "base.html" %}
-{% block title %}Today's Sales | Cafe POS{% endblock %}
-{% block eyebrow %}Dashboard / Today's Sales{% endblock %}
+{% block title %}Dashboard | Cafe POS{% endblock %}
+{% block eyebrow %}Dashboard / Today{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Today's Sales</h1><p>Products sold and profit from completed bills today.</p></div></div>
-<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="card stat"><span class="stat-label">Today's Sales</span><h2 class="stat-value">₹{{ total_sales|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Products Sold</span><h2 class="stat-value">{{ total_quantity|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Today's Profit</span><h2 class="stat-value positive">₹{{ total_profit|floatformat:2 }}</h2></div></div>
-<div class="card"><div class="row" style="padding-top:0"><div><h2 style="margin-bottom:4px">Products Sold Today</h2><span class="muted">Grouped from today's saved bill items</span></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Product</th><th>Quantity Sold</th><th>Selling Amount</th><th>Profit</th></tr></thead><tbody>{% for product in products_sold %}<tr><td><b>{{ product.item_name }}</b>{% if product.menu_item__category %}<br><small class="muted">{{ product.menu_item__category }}</small>{% endif %}</td><td>{{ product.quantity_sold|floatformat:2 }}</td><td>₹{{ product.selling_amount|floatformat:2 }}</td><td class="positive">₹{{ product.profit|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:30px">No products sold today.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="page-head"><div><h1>Today's Overview</h1><p>Sales, profit and stock at a glance.</p></div></div>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+  <div class="card stat"><span class="stat-label">Today's Sales</span><h2 class="stat-value">₹{{ total_sales|floatformat:2 }}</h2><span class="muted">{{ total_quantity|floatformat:2 }} items sold</span></div>
+  <div class="card stat"><span class="stat-label">Today's Profit</span><h2 class="stat-value positive">₹{{ total_profit|floatformat:2 }}</h2><span class="muted">Before expenses</span></div>
+  <div class="card stat"><span class="stat-label">Products Sold</span><h2 class="stat-value">{{ products_sold|length }}</h2><span class="muted">Distinct products today</span></div>
+  <div class="card stat"><span class="stat-label">Low Stock</span><h2 class="stat-value">{{ low_stock_count }}</h2><span class="muted">Active items with 5 units or fewer</span></div>
+</div>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:16px;align-items:start">
+  <div class="card"><div class="row" style="padding-top:0"><div><h2 style="margin-bottom:4px">Top 5 Items Today</h2><span class="muted">Ranked by sales amount</span></div></div>
+    <div class="table-wrap"><table class="data-table"><thead><tr><th>Product</th><th>Qty</th><th>Sales</th><th>Profit</th></tr></thead><tbody>
+      {% for product in top_products %}<tr><td><b>{{ product.item_name }}</b>{% if product.menu_item__category %}<br><small class="muted">{{ product.menu_item__category }}</small>{% endif %}</td><td>{{ product.quantity_sold|floatformat:2 }}</td><td>₹{{ product.selling_amount|floatformat:2 }}</td><td class="positive">₹{{ product.profit|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:24px">No items sold today.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+  <div class="card"><div class="row" style="padding-top:0"><div><h2 style="margin-bottom:4px">Low Stock Warnings</h2><span class="muted">Restock when convenient</span></div></div>
+    <div class="table-wrap"><table class="data-table"><thead><tr><th>Product</th><th>Category</th><th>In Stock</th></tr></thead><tbody>
+      {% for product in low_stock_products %}<tr><td><b>{{ product.name }}</b></td><td>{{ product.category|default:"—" }}</td><td><span class="{{ product.stock|yesno:'positive,negative' }}">{{ product.stock|floatformat:2 }}</span></td></tr>{% empty %}<tr><td colspan="3" class="muted" style="text-align:center;padding:24px">No low stock items.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</div>
+<div class="card" style="margin-top:16px"><div class="row" style="padding-top:0"><div><h2 style="margin-bottom:4px">All Products Sold Today</h2><span class="muted">Grouped from today's saved bill items</span></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Product</th><th>Quantity Sold</th><th>Selling Amount</th><th>Profit</th></tr></thead><tbody>{% for product in products_sold %}<tr><td><b>{{ product.item_name }}</b>{% if product.menu_item__category %}<br><small class="muted">{{ product.menu_item__category }}</small>{% endif %}</td><td>{{ product.quantity_sold|floatformat:2 }}</td><td>₹{{ product.selling_amount|floatformat:2 }}</td><td class="positive">₹{{ product.profit|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:30px">No products sold today.</td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}

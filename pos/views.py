@@ -8,6 +8,7 @@ from io import BytesIO
 
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum
+from django.db.models.functions import TruncDate
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
 from django.http import HttpResponseForbidden
@@ -438,8 +439,13 @@ def dashboard(request):
     total_sales = sum((row["selling_amount"] for row in products_sold), Decimal("0"))
     total_quantity = sum((row["quantity_sold"] for row in products_sold), Decimal("0"))
     total_profit = sum((row["profit"] for row in products_sold), Decimal("0"))
+    top_products = sorted(products_sold, key=lambda row: row["selling_amount"], reverse=True)[:5]
+    low_stock = Product.objects.filter(is_active=True, stock__lte=5)
     return render(request, "pos/dashboard.html", {
         "products_sold": products_sold,
+        "top_products": top_products,
+        "low_stock_products": low_stock.order_by("stock", "name"),
+        "low_stock_count": low_stock.count(),
         "total_sales": total_sales,
         "total_quantity": total_quantity,
         "total_profit": total_profit,
@@ -487,6 +493,12 @@ def report_context(bills, from_date, to_date):
         card=Sum("grand_total", filter=Q(payment_method=Bill.CARD)),
     )
     item_total = bills.aggregate(total=Sum("items__quantity"))["total"] or Decimal("0")
+    daily_sales = list(
+        bills.annotate(sale_day=TruncDate("created_at"))
+        .values("sale_day")
+        .annotate(sales=Sum("grand_total"))
+        .order_by("sale_day")
+    )
     return {
         "bills": bills,
         "from_date": from_date,
@@ -497,6 +509,12 @@ def report_context(bills, from_date, to_date):
         "cash_sales": totals["cash"] or Decimal("0"),
         "upi_sales": totals["upi"] or Decimal("0"),
         "card_sales": totals["card"] or Decimal("0"),
+        "sales_chart_labels": json.dumps([row["sale_day"].strftime("%d %b %Y") for row in daily_sales]),
+        "sales_chart_values": json.dumps([float(row["sales"] or 0) for row in daily_sales]),
+        "payment_chart_labels": json.dumps([label for _, label in Bill.PAYMENT_CHOICES]),
+        "payment_chart_values": json.dumps([
+            float(totals[method.lower()] or 0) for method, _ in Bill.PAYMENT_CHOICES
+        ]),
         "business_settings": BusinessSettings.current(),
     }
 

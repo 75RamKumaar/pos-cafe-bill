@@ -7,5 +7,33 @@
 {% if not total_bills %}<div class="alert alert-error">No sales data found for {{ from_date|date:"d M Y" }} to {{ to_date|date:"d M Y" }}.</div>{% endif %}
 <div class="grid"><div class="card stat"><span class="stat-label">Total Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ total_sales|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Number of Bills</span><h2 class="stat-value">{{ total_bills }}</h2></div><div class="card stat"><span class="stat-label">Total Items Sold</span><h2 class="stat-value">{{ total_items|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Cash Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ cash_sales|floatformat:2 }}</h2></div></div>
 <div class="grid" style="margin-top:16px"><div class="card stat"><span class="stat-label">UPI Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ upi_sales|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Card Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ card_sales|floatformat:2 }}</h2></div></div>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:16px">
+  <div class="card"><h3>Sales by Day</h3><p class="muted">Daily bill totals for {{ from_date|date:"d M Y" }} – {{ to_date|date:"d M Y" }}</p><div style="height:280px"><canvas id="salesByDayChart" aria-label="Sales by day chart" role="img"></canvas></div></div>
+  <div class="card"><h3>Payment Method Breakdown</h3><p class="muted">Sales total by payment method in the selected range</p><div style="height:280px"><canvas id="paymentMethodChart" aria-label="Payment method breakdown chart" role="img"></canvas></div></div>
+</div>
+{{ sales_chart_labels|json_script:"sales-chart-labels" }}
+{{ sales_chart_values|json_script:"sales-chart-values" }}
+{{ payment_chart_labels|json_script:"payment-chart-labels" }}
+{{ payment_chart_values|json_script:"payment-chart-values" }}
+{{ business_settings.currency_symbol|json_script:"currency-symbol" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const reportLabels = JSON.parse(document.getElementById('sales-chart-labels').textContent);
+  const reportSales = JSON.parse(document.getElementById('sales-chart-values').textContent);
+  const paymentLabels = JSON.parse(document.getElementById('payment-chart-labels').textContent);
+  const paymentSales = JSON.parse(document.getElementById('payment-chart-values').textContent);
+  const currency = JSON.parse(document.getElementById('currency-symbol').textContent);
+  const money = value => `${currency}${Number(value).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  new Chart(document.getElementById('salesByDayChart'), {
+    type: 'bar',
+    data: {labels: reportLabels, datasets: [{label: 'Sales', data: reportSales, backgroundColor: '#38a889', borderRadius: 6}]},
+    options: {responsive: true, maintainAspectRatio: false, scales: {y: {beginAtZero: true, ticks: {callback: money}}}, plugins: {tooltip: {callbacks: {label: context => money(context.raw)}}}}
+  });
+  new Chart(document.getElementById('paymentMethodChart'), {
+    type: 'doughnut',
+    data: {labels: paymentLabels, datasets: [{data: paymentSales, backgroundColor: ['#38a889', '#5b8def', '#f2ad4e'], borderWidth: 0}]},
+    options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}, tooltip: {callbacks: {label: context => `${context.label}: ${money(context.raw)}`}}}}
+  });
+</script>
 <div class="card"><div class="row" style="padding-top:0"><div><h3 style="margin-bottom:4px">Sales detail</h3><span class="muted">One row per saved bill item</span></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Bill No.</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th></tr></thead><tbody>{% for bill in bills %}<tr><td><a href="{% url 'bill_detail' bill.id %}"><b>{{ bill.bill_number }}</b></a></td><td>{{ bill.created_at|date:"d M Y, h:i A" }}</td><td>{{ bill.customer.name|default:"Walk-in Customer" }}</td><td>{% for item in bill.items.all %}{{ item.item_name }} × {{ item.quantity|floatformat:2 }}{% if not forloop.last %}, {% endif %}{% endfor %}</td><td><b>{{ business_settings.currency_symbol }}{{ bill.grand_total|floatformat:2 }}</b></td><td>{{ bill.get_payment_method_display }}</td></tr>{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">No sales in this date range.</td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}
