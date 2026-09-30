@@ -1,9 +1,11 @@
 from decimal import Decimal
 from io import BytesIO
+import os
 import re
 
 from django import forms
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import UploadedFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .models import BusinessSettings, Customer, Expense, Product
@@ -11,19 +13,36 @@ from .models import BusinessSettings, Customer, Expense, Product
 
 MAX_IMAGE_SIZE = 3 * 1024 * 1024
 MAX_IMAGE_DIMENSION = 800
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 
 class MenuItemForm(forms.ModelForm):
     price = forms.DecimalField(
+        min_value=Decimal("0.01"),
+        max_digits=10,
+        decimal_places=2,
+        error_messages={"min_value": "Price must be at least 0.01."},
+    )
+    cost_price = forms.DecimalField(
         min_value=Decimal("0"),
         max_digits=10,
         decimal_places=2,
-        error_messages={"min_value": "Price must be greater than or equal to zero."},
+        required=False,
+        initial=Decimal("0.00"),
+        error_messages={"min_value": "Cost price must be greater than or equal to zero."},
+    )
+    stock = forms.DecimalField(
+        min_value=Decimal("0"),
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        initial=Decimal("0.00"),
+        error_messages={"min_value": "Stock must be greater than or equal to zero."},
     )
 
     class Meta:
         model = Product
-        fields = ["name", "category", "shortcut_key", "price", "cost_price", "description", "image", "is_active"]
+        fields = ["name", "category", "shortcut_key", "price", "cost_price", "stock", "description", "image", "is_active"]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 4}),
             "is_active": forms.CheckboxInput(),
@@ -35,28 +54,55 @@ class MenuItemForm(forms.ModelForm):
             raise forms.ValidationError("Name is required.")
         return name
 
+    def clean_cost_price(self):
+        cost_price = self.cleaned_data.get("cost_price")
+        if cost_price is None:
+            return Decimal("0.00")
+        return cost_price
+
+    def clean_stock(self):
+        stock = self.cleaned_data.get("stock")
+        if stock is None:
+            return Decimal("0.00")
+        return stock
+
     def clean_shortcut_key(self):
         shortcut = self.cleaned_data.get("shortcut_key", "").strip().upper()
         if shortcut and not re.fullmatch(r"[A-Z0-9]+", shortcut):
             raise forms.ValidationError("Use only letters and numbers, such as T, 10, or A1.")
-        if shortcut and self.cleaned_data.get("is_active", True):
-            duplicate = Product.objects.filter(is_active=True, shortcut_key__iexact=shortcut)
-            if self.instance.pk:
-                duplicate = duplicate.exclude(pk=self.instance.pk)
-            if duplicate.exists():
-                raise forms.ValidationError(
-                    f"Shortcut key {shortcut} is already assigned to {duplicate.first().name}."
-                )
         return shortcut
 
     def clean_category(self):
         category = self.cleaned_data["category"].strip()
         return category
 
+    def clean(self):
+        cleaned_data = super().clean()
+        shortcut = cleaned_data.get("shortcut_key", "")
+        is_active = cleaned_data.get("is_active", True)
+        if shortcut and is_active:
+            duplicate = Product.objects.filter(is_active=True, shortcut_key__iexact=shortcut)
+            if self.instance.pk:
+                duplicate = duplicate.exclude(pk=self.instance.pk)
+            if duplicate.exists():
+                self.add_error(
+                    "shortcut_key",
+                    f"Shortcut key {shortcut} is already assigned to {duplicate.first().name}.",
+                )
+        return cleaned_data
+
     def clean_image(self):
         image = self.cleaned_data.get("image")
-        if not image or not getattr(image, "file", None):
+        if not image or not isinstance(image, UploadedFile):
             return image
+
+        name = getattr(image, "name", "")
+        ext = os.path.splitext(name)[1].lower()
+        if ext not in ALLOWED_IMAGE_EXTENSIONS:
+            raise forms.ValidationError(
+                f"Unsupported file extension '{ext}'. Allowed extensions are: {', '.join(sorted(ALLOWED_IMAGE_EXTENSIONS))}."
+            )
+
         if image.size > MAX_IMAGE_SIZE:
             raise forms.ValidationError("Image files must be 3 MB or smaller.")
 

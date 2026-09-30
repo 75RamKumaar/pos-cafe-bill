@@ -1,0 +1,16 @@
+{% load pos_tags %}
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<div class="pagination-bar" style="display:flex;align-items:center;justify-content:space-between;padding:16px 4px 4px;margin-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);flex-wrap:wrap;gap:10px">
+    <div>
+        <span>Page <b>{{ page_obj.number }}</b> of <b>{{ page_obj.paginator.num_pages }}</b> ({{ page_obj.paginator.count }} total)</span>
+    </div>
+    <div class="actions" style="gap:8px">
+        {% if page_obj.has_previous %}
+        <a class="btn btn-outline" href="?{% url_replace page=page_obj.previous_page_number %}" style="min-height:36px;padding:6px 12px;font-size:13px">← Previous</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a class="btn btn-outline" href="?{% url_replace page=page_obj.next_page_number %}" style="min-height:36px;padding:6px 12px;font-size:13px">Next →</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

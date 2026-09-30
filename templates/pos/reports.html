@@ -6,7 +6,7 @@
 <div class="card"><form method="get" class="actions"><div><label class="field-label" for="from_date">From Date</label><input id="from_date" type="date" name="from_date" value="{{ from_date|date:'Y-m-d' }}"></div><div><label class="field-label" for="to_date">To Date</label><input id="to_date" type="date" name="to_date" value="{{ to_date|date:'Y-m-d' }}"></div><button class="btn btn-outline" type="submit">Apply Dates</button><a class="btn btn-primary" href="{% url 'export_sales_csv' %}?from_date={{ from_date|date:'Y-m-d' }}&to_date={{ to_date|date:'Y-m-d' }}">📥 Export Sales CSV</a></form>{% if date_error %}<div class="alert alert-error" style="margin-top:16px">{{ date_error }}</div>{% endif %}</div>
 {% if not total_bills %}<div class="alert alert-error">No sales data found for {{ from_date|date:"d M Y" }} to {{ to_date|date:"d M Y" }}.</div>{% endif %}
 <div class="grid"><div class="card stat"><span class="stat-label">Total Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ total_sales|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Number of Bills</span><h2 class="stat-value">{{ total_bills }}</h2></div><div class="card stat"><span class="stat-label">Total Items Sold</span><h2 class="stat-value">{{ total_items|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Cash Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ cash_sales|floatformat:2 }}</h2></div></div>
-<div class="grid" style="margin-top:16px"><div class="card stat"><span class="stat-label">UPI Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ upi_sales|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Card Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ card_sales|floatformat:2 }}</h2></div></div>
+<div class="grid" style="margin-top:16px"><div class="card stat"><span class="stat-label">UPI Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ upi_sales|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Card Sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ card_sales|floatformat:2 }}</h2></div><div class="card stat"><span class="stat-label">Khata (credit) sales</span><h2 class="stat-value">{{ business_settings.currency_symbol }}{{ khata_sales|floatformat:2 }}</h2></div></div>
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:16px">
   <div class="card"><h3>Sales by Day</h3><p class="muted">Daily bill totals for {{ from_date|date:"d M Y" }} – {{ to_date|date:"d M Y" }}</p><div style="height:280px"><canvas id="salesByDayChart" aria-label="Sales by day chart" role="img"></canvas></div></div>
   <div class="card"><h3>Payment Method Breakdown</h3><p class="muted">Sales total by payment method in the selected range</p><div style="height:280px"><canvas id="paymentMethodChart" aria-label="Payment method breakdown chart" role="img"></canvas></div></div>
@@ -16,7 +16,8 @@
 {{ payment_chart_labels|json_script:"payment-chart-labels" }}
 {{ payment_chart_values|json_script:"payment-chart-values" }}
 {{ business_settings.currency_symbol|json_script:"currency-symbol" }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% load static %}
+<script src="{% static 'pos/chart.umd.js' %}"></script>
 <script>
   const reportLabels = JSON.parse(document.getElementById('sales-chart-labels').textContent);
   const reportSales = JSON.parse(document.getElementById('sales-chart-values').textContent);
@@ -31,7 +32,7 @@
   });
   new Chart(document.getElementById('paymentMethodChart'), {
     type: 'doughnut',
-    data: {labels: paymentLabels, datasets: [{data: paymentSales, backgroundColor: ['#38a889', '#5b8def', '#f2ad4e'], borderWidth: 0}]},
+    data: {labels: paymentLabels, datasets: [{data: paymentSales, backgroundColor: ['#38a889', '#5b8def', '#f2ad4e', '#e85d3f'], borderWidth: 0}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}, tooltip: {callbacks: {label: context => `${context.label}: ${money(context.raw)}`}}}}
   });
 </script>

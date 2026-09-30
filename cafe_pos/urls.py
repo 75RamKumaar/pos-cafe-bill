@@ -1,6 +1,6 @@
-from django.urls import include, path
+from django.urls import include, path, re_path
 from django.conf import settings
-from django.conf.urls.static import static
+from django.views.static import serve
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 
@@ -9,4 +9,7 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("admin/", admin.site.urls),
     path("", include("pos.urls")),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Serve uploaded media files for single-shop LAN installs.
+    # Note: Dedicated web servers like nginx or Caddy are better at scale.
+    re_path(r"^media/(?P<path>.*)$", serve, {"document_root": settings.MEDIA_ROOT}),
+]

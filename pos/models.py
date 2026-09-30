@@ -1,8 +1,33 @@
 from decimal import Decimal
 from django.conf import settings
 from django.db import models
-from django.db.models.functions import Lower
+from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
+
+
+class CustomerQuerySet(models.QuerySet):
+    def with_outstanding(self):
+        credits = Coalesce(
+            models.Sum(
+                "khata_transactions__amount",
+                filter=models.Q(khata_transactions__kind="CREDIT"),
+            ),
+            Decimal("0.00"),
+        )
+        payments = Coalesce(
+            models.Sum(
+                "khata_transactions__amount",
+                filter=models.Q(khata_transactions__kind="PAYMENT"),
+            ),
+            Decimal("0.00"),
+        )
+        return self.annotate(
+            outstanding=Coalesce(
+                models.F("opening_balance") + credits - payments,
+                Decimal("0.00"),
+                output_field=models.DecimalField(max_digits=10, decimal_places=2),
+            )
+        ).order_by("name")
 
 
 class Product(models.Model):
@@ -42,11 +67,15 @@ class Customer(models.Model):
     notes = models.TextField(blank=True)
     opening_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
+    objects = CustomerQuerySet.as_manager()
+
     class Meta:
         ordering = ["name"]
 
     @property
     def balance(self):
+        if hasattr(self, "outstanding"):
+            return self.outstanding
         credits = self.khata_transactions.filter(kind="CREDIT").aggregate(
             total=models.Sum("amount")
         )["total"] or Decimal("0")
@@ -63,17 +92,26 @@ class Bill(models.Model):
     CASH = "CASH"
     UPI = "UPI"
     CARD = "CARD"
+    KHATA = "KHATA"
 
     PAYMENT_CHOICES = [
         (CASH, "Cash"),
         (UPI, "UPI"),
         (CARD, "Card"),
+        (KHATA, "Khata (credit)"),
     ]
 
     bill_number = models.CharField(max_length=40, unique=True)
     customer = models.ForeignKey(
         Customer, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="bills",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_bills",
     )
     created_at = models.DateTimeField(default=timezone.now)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
@@ -113,6 +151,13 @@ class KhataTransaction(models.Model):
 
     customer = models.ForeignKey(
         Customer, related_name="khata_transactions", on_delete=models.CASCADE
+    )
+    bill = models.ForeignKey(
+        Bill,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="khata_entries",
     )
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2)

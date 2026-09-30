@@ -8,6 +8,7 @@
   <div class="card stat"><span class="stat-label">Today's Profit</span><h2 class="stat-value positive">₹{{ total_profit|floatformat:2 }}</h2><span class="muted">Before expenses</span></div>
   <div class="card stat"><span class="stat-label">Products Sold</span><h2 class="stat-value">{{ products_sold|length }}</h2><span class="muted">Distinct products today</span></div>
   <div class="card stat"><span class="stat-label">Low Stock</span><h2 class="stat-value">{{ low_stock_count }}</h2><span class="muted">Active items with 5 units or fewer</span></div>
+  <div class="card stat"><span class="stat-label">Khata Outstanding</span><h2 class="stat-value">₹{{ total_outstanding|floatformat:2 }}</h2><span class="muted">Total customer balance</span></div>
 </div>
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:16px;align-items:start">
   <div class="card"><div class="row" style="padding-top:0"><div><h2 style="margin-bottom:4px">Top 5 Items Today</h2><span class="muted">Ranked by sales amount</span></div></div>

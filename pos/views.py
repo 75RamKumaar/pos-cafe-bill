@@ -3,9 +3,37 @@ import csv
 import json
 from functools import wraps
 from datetime import datetime, time, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from io import BytesIO
 
+TWO_PLACES = Decimal("0.01")
+MAX_DECIMAL_LIMIT = Decimal("99999999.99")
+
+
+def parse_decimal(value, min_value=None, max_value=None):
+    if value is None or value == "":
+        raise ValueError("Value is required.")
+    try:
+        val_str = str(value).strip()
+        d = Decimal(val_str)
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid decimal value: {value}") from exc
+
+    if not d.is_finite():
+        raise ValueError(f"Non-finite decimal value is not allowed: {value}")
+
+    range_limit = max_value if max_value is not None else MAX_DECIMAL_LIMIT
+    if abs(d) > range_limit:
+        raise ValueError(f"Value {value} out of range.")
+
+    if min_value is not None and d < min_value:
+        raise ValueError(f"Value cannot be less than {min_value}.")
+    if max_value is not None and d > max_value:
+        raise ValueError(f"Value cannot exceed {max_value}.")
+
+    return d.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
@@ -17,7 +45,22 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 import qrcode
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.db.models.deletion import ProtectedError
+
+def parse_date_param(request, param_name="date"):
+    date_str = request.GET.get(param_name, "").strip()
+    if not date_str:
+        return None
+    try:
+        parsed = parse_date(date_str)
+        if parsed is None:
+            messages.error(request, "Enter a valid date")
+            return None
+        return parsed
+    except (ValueError, TypeError):
+        messages.error(request, "Enter a valid date")
+        return None
 
 from .forms import BusinessSettingsForm, CustomerForm, ExpenseForm, MenuItemForm
 from .models import (
@@ -82,56 +125,132 @@ def bill_create(request):
 
     try:
         data = json.loads(request.body)
-        raw_items = data.get("items", [])
-        payment_method = data.get("payment_method")
-        customer_id = data.get("customer_id") or None
-        discount = Decimal(str(data.get("discount", "0")))
-    except (json.JSONDecodeError, AttributeError, InvalidOperation, TypeError):
+        if not isinstance(data, dict):
+            return JsonResponse({"error": "Invalid bill data."}, status=400)
+    except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
         return JsonResponse({"error": "Invalid bill data."}, status=400)
 
-    if not raw_items:
+    raw_items = data.get("items")
+    if not isinstance(raw_items, list) or not raw_items:
         return JsonResponse({"error": "Add at least one item."}, status=400)
+
+    if len(raw_items) > 100:
+        return JsonResponse({"error": "Cannot exceed 100 items per bill."}, status=400)
+
+    payment_method = data.get("payment_method")
     if payment_method not in dict(Bill.PAYMENT_CHOICES):
         return JsonResponse({"error": "Select a valid payment method."}, status=400)
-    if discount < 0:
-        return JsonResponse({"error": "Discount cannot be negative."}, status=400)
 
+    customer_id = data.get("customer_id")
     customer = None
-    if customer_id:
-        customer = get_object_or_404(Customer, pk=customer_id)
-
-    validated_items = []
-    subtotal = Decimal("0.00")
-    for raw in raw_items:
+    if customer_id not in (None, ""):
         try:
-            product_id = int(raw["id"])
-            quantity = Decimal(str(raw["quantity"]))
-        except (KeyError, TypeError, ValueError, InvalidOperation):
+            customer_id_int = int(customer_id)
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Invalid customer ID."}, status=400)
+        customer = Customer.objects.filter(pk=customer_id_int).first()
+        if customer is None:
+            return JsonResponse({"error": "Customer not found."}, status=400)
+
+    if payment_method == Bill.KHATA and customer is None:
+        return JsonResponse({"error": "A customer is required for Khata credit checkout."}, status=400)
+
+    raw_discount = data.get("discount", "0")
+    if raw_discount is None or raw_discount == "":
+        raw_discount = "0"
+    try:
+        discount = parse_decimal(raw_discount, min_value=Decimal("0.00"), max_value=Decimal("99999999.99"))
+    except ValueError:
+        return JsonResponse({"error": "Invalid discount."}, status=400)
+
+    merged_items = {}
+    for raw in raw_items:
+        if not isinstance(raw, dict):
             return JsonResponse({"error": "Invalid item or quantity."}, status=400)
-        if quantity <= 0 or quantity > Decimal("9999"):
+        try:
+            product_id = int(raw.get("id"))
+        except (KeyError, TypeError, ValueError):
+            return JsonResponse({"error": "Invalid item or quantity."}, status=400)
+
+        if product_id <= 0:
+            return JsonResponse({"error": "Invalid item or quantity."}, status=400)
+
+        raw_qty = raw.get("quantity")
+        try:
+            qty = parse_decimal(raw_qty, min_value=Decimal("0.01"), max_value=Decimal("9999.00"))
+        except ValueError:
+            return JsonResponse({"error": "Invalid item or quantity."}, status=400)
+
+        if qty <= Decimal("0.00") or qty > Decimal("9999.00"):
             return JsonResponse({"error": "Quantities must be positive."}, status=400)
 
-        product = Product.objects.filter(pk=product_id, is_active=True).first()
-        if product is None:
-            return JsonResponse({"error": "An item is unavailable and was not added."}, status=400)
-        line_total = product.price * quantity
-        subtotal += line_total
-        validated_items.append((product, quantity, line_total))
+        merged_items[product_id] = merged_items.get(product_id, Decimal("0.00")) + qty
+        if merged_items[product_id] > Decimal("9999.00"):
+            return JsonResponse({"error": "Quantity cannot exceed 9999."}, status=400)
 
-    if discount > subtotal:
-        return JsonResponse({"error": "Discount cannot exceed the subtotal."}, status=400)
+    if len(merged_items) > 100:
+        return JsonResponse({"error": "Cannot exceed 100 items per bill."}, status=400)
 
-    grand_total = subtotal - discount
-    bill_number = f"BILL-{timezone.now():%Y%m%d%H%M%S%f}"
+    sorted_product_ids = sorted(merged_items.keys())
     with transaction.atomic():
+        products_query = Product.objects.select_for_update().filter(
+            pk__in=sorted_product_ids,
+            is_active=True,
+        )
+        products_by_id = {p.pk: p for p in products_query}
+
+        for p_id in sorted_product_ids:
+            if p_id not in products_by_id:
+                return JsonResponse({"error": "An item is unavailable and was not added."}, status=400)
+
+        for p_id in sorted_product_ids:
+            product = products_by_id[p_id]
+            req_qty = merged_items[p_id]
+            if product.stock < req_qty:
+                return JsonResponse(
+                    {
+                        "error": f"Insufficient stock for {product.name}. Available: {product.stock}"
+                    },
+                    status=400,
+                )
+
+        validated_items = []
+        subtotal = Decimal("0.00")
+        for p_id in sorted_product_ids:
+            product = products_by_id[p_id]
+            quantity = merged_items[p_id]
+            line_total = (product.price * quantity).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+            subtotal += line_total
+            validated_items.append((product, quantity, line_total))
+
+        if discount > subtotal:
+            return JsonResponse({"error": "Discount cannot exceed the subtotal."}, status=400)
+
+        grand_total = (subtotal - discount).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+
+        today_prefix = f"{timezone.localdate():%Y%m%d}"
+        prefix_pattern = f"{today_prefix}-"
+        bills_today = Bill.objects.filter(
+            bill_number__startswith=prefix_pattern
+        ).values_list("bill_number", flat=True)
+        max_seq = 0
+        for b_num in bills_today:
+            parts = b_num.split("-")
+            if len(parts) == 2 and parts[1].isdigit():
+                max_seq = max(max_seq, int(parts[1]))
+        next_seq = max_seq + 1
+        bill_number = f"{today_prefix}-{next_seq:04d}"
+
         bill = Bill.objects.create(
             bill_number=bill_number,
             customer=customer,
+            created_by=request.user if request.user.is_authenticated else None,
             subtotal=subtotal,
             discount=discount,
             grand_total=grand_total,
             payment_method=payment_method,
         )
+
         for product, quantity, line_total in validated_items:
             BillItem.objects.create(
                 bill=bill,
@@ -143,8 +262,16 @@ def bill_create(request):
                 quantity=quantity,
                 total=line_total,
             )
-            product.stock = max(Decimal("0"), product.stock - quantity)
-            product.save(update_fields=["stock"])
+            Product.objects.filter(pk=product.pk).update(stock=F("stock") - quantity)
+
+        if payment_method == Bill.KHATA:
+            KhataTransaction.objects.create(
+                customer=customer,
+                bill=bill,
+                kind=KhataTransaction.CREDIT,
+                amount=grand_total,
+                note=f"Credit sale: {bill.bill_number}",
+            )
 
     return JsonResponse({
         "ok": True,
@@ -158,16 +285,20 @@ def bill_create(request):
 @role_required("Cashier", "Owner")
 def billing_history(request):
     query = request.GET.get("q", "").strip()
-    date = request.GET.get("date", "").strip()
-    bills = Bill.objects.select_related("customer")
+    raw_date = request.GET.get("date", "").strip()
+    parsed_date = parse_date_param(request, "date")
+    bills = Bill.objects.select_related("customer").order_by("-created_at", "-id")
     if query:
         bills = bills.filter(Q(bill_number__icontains=query) | Q(customer__name__icontains=query))
-    if date:
-        bills = bills.filter(created_at__date=date)
+    if parsed_date:
+        bills = bills.filter(created_at__date=parsed_date)
+    paginator = Paginator(bills, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
     return render(request, "pos/billing_history.html", {
-        "bills": bills,
+        "bills": page_obj,
+        "page_obj": page_obj,
         "query": query,
-        "selected_date": date,
+        "selected_date": raw_date if parsed_date else "",
     })
 
 
@@ -198,14 +329,17 @@ def bill_delete(request, bill_id):
         with transaction.atomic():
             bill = get_object_or_404(Bill.objects.prefetch_related("items__menu_item"), pk=bill_id)
             for item in bill.items.all():
-                product = item.menu_item
-                product.stock += item.quantity
-                product.save(update_fields=["stock"])
+                Product.objects.filter(pk=item.menu_item_id).update(stock=F("stock") + item.quantity)
+            is_khata = (bill.payment_method == Bill.KHATA)
             log_audit(
                 request,
                 "DELETE",
                 bill,
-                {"grand_total": str(bill.grand_total), "restored_items": bill.items.count()},
+                {
+                    "grand_total": str(bill.grand_total),
+                    "restored_items": bill.items.count(),
+                    "khata_credit_reversed": is_khata,
+                },
             )
             bill.delete()
         messages.success(request, "Bill deleted.")
@@ -283,17 +417,19 @@ def menu_item_delete(request, item_id):
 @role_required("Cashier", "Owner")
 def khata(request):
     return render(request, "pos/khata.html", {
-        "customers": Customer.objects.all(),
+        "customers": Customer.objects.with_outstanding(),
     })
 
 
 @role_required("Cashier", "Owner")
 def customers(request):
     query = request.GET.get("q", "").strip()
-    customer_list = Customer.objects.all()
+    customer_list = Customer.objects.with_outstanding()
     if query:
         customer_list = customer_list.filter(Q(name__icontains=query) | Q(phone__icontains=query))
-    return render(request, "pos/customers.html", {"customers": customer_list, "query": query})
+    paginator = Paginator(customer_list, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "pos/customers.html", {"customers": page_obj, "page_obj": page_obj, "query": query})
 
 
 @role_required("Cashier", "Owner")
@@ -371,19 +507,23 @@ def khata_payment(request, customer_id):
 def expenses(request):
     query = request.GET.get("q", "").strip()
     category = request.GET.get("category", "").strip()
-    date = request.GET.get("date", "").strip()
-    expense_list = Expense.objects.all()
+    raw_date = request.GET.get("date", "").strip()
+    parsed_date = parse_date_param(request, "date")
+    expense_list = Expense.objects.all().order_by("-expense_date", "-id")
     if query:
         expense_list = expense_list.filter(Q(title__icontains=query) | Q(category__icontains=query) | Q(notes__icontains=query))
     if category:
         expense_list = expense_list.filter(category=category)
-    if date:
-        expense_list = expense_list.filter(expense_date=date)
+    if parsed_date:
+        expense_list = expense_list.filter(expense_date=parsed_date)
     today = timezone.localdate()
+    paginator = Paginator(expense_list, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
     return render(request, "pos/expenses.html", {
-        "expenses": expense_list,
+        "expenses": page_obj,
+        "page_obj": page_obj,
         "categories": Expense.objects.values_list("category", flat=True).distinct().order_by("category"),
-        "query": query, "selected_category": category, "selected_date": date,
+        "query": query, "selected_category": category, "selected_date": raw_date if parsed_date else "",
         "today_total": Expense.objects.filter(expense_date=today).aggregate(v=Sum("amount"))["v"] or Decimal("0"),
         "month_total": Expense.objects.filter(expense_date__year=today.year, expense_date__month=today.month).aggregate(v=Sum("amount"))["v"] or Decimal("0"),
         "all_total": Expense.objects.aggregate(v=Sum("amount"))["v"] or Decimal("0"),
@@ -441,6 +581,8 @@ def dashboard(request):
     total_profit = sum((row["profit"] for row in products_sold), Decimal("0"))
     top_products = sorted(products_sold, key=lambda row: row["selling_amount"], reverse=True)[:5]
     low_stock = Product.objects.filter(is_active=True, stock__lte=5)
+    customers_with_outstanding = Customer.objects.with_outstanding()
+    total_outstanding = customers_with_outstanding.aggregate(total=Sum("outstanding"))["total"] or Decimal("0")
     return render(request, "pos/dashboard.html", {
         "products_sold": products_sold,
         "top_products": top_products,
@@ -449,6 +591,8 @@ def dashboard(request):
         "total_sales": total_sales,
         "total_quantity": total_quantity,
         "total_profit": total_profit,
+        "total_outstanding": total_outstanding,
+        "outstanding_customers": customers_with_outstanding.filter(outstanding__gt=0),
     })
 
 
@@ -491,6 +635,7 @@ def report_context(bills, from_date, to_date):
         cash=Sum("grand_total", filter=Q(payment_method=Bill.CASH)),
         upi=Sum("grand_total", filter=Q(payment_method=Bill.UPI)),
         card=Sum("grand_total", filter=Q(payment_method=Bill.CARD)),
+        khata=Sum("grand_total", filter=Q(payment_method=Bill.KHATA)),
     )
     item_total = bills.aggregate(total=Sum("items__quantity"))["total"] or Decimal("0")
     daily_sales = list(
@@ -509,6 +654,7 @@ def report_context(bills, from_date, to_date):
         "cash_sales": totals["cash"] or Decimal("0"),
         "upi_sales": totals["upi"] or Decimal("0"),
         "card_sales": totals["card"] or Decimal("0"),
+        "khata_sales": totals["khata"] or Decimal("0"),
         "sales_chart_labels": json.dumps([row["sale_day"].strftime("%d %b %Y") for row in daily_sales]),
         "sales_chart_values": json.dumps([float(row["sales"] or 0) for row in daily_sales]),
         "payment_chart_labels": json.dumps([label for _, label in Bill.PAYMENT_CHOICES]),
@@ -588,5 +734,7 @@ def log_audit(request, action, instance, details=None):
 
 @role_required("Owner")
 def audit_logs(request):
-    logs = AuditLog.objects.select_related("actor")
-    return render(request, "pos/audit_logs.html", {"logs": logs})
+    logs = AuditLog.objects.select_related("actor").order_by("-timestamp", "-id")
+    paginator = Paginator(logs, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "pos/audit_logs.html", {"logs": page_obj, "page_obj": page_obj})
