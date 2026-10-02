@@ -1,10 +1,8 @@
-import base64
 import csv
 import json
 from functools import wraps
 from datetime import datetime, time, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from io import BytesIO
 
 TWO_PLACES = Decimal("0.01")
 MAX_DECIMAL_LIMIT = Decimal("99999999.99")
@@ -43,7 +41,7 @@ from django.http import HttpResponseForbidden
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-import qrcode
+
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.db.models.deletion import ProtectedError
@@ -308,18 +306,11 @@ def bill_detail(request, bill_id):
     mode = request.GET.get("mode", "a4").lower()
     if mode not in {"a4", "thermal", "thermal58"}:
         mode = "a4"
-    digital_url = request.build_absolute_uri(reverse("bill_detail", args=[bill.id]))
-    qr_image = qrcode.make(digital_url)
-    qr_output = BytesIO()
-    qr_image.save(qr_output, format="PNG")
-    qr_data_uri = "data:image/png;base64," + base64.b64encode(qr_output.getvalue()).decode("ascii")
     return render(request, "pos/bill_detail.html", {
         "bill": bill,
         "business_settings": BusinessSettings.current(),
         "auto_print": request.GET.get("print") == "1",
         "receipt_mode": mode,
-        "digital_url": digital_url,
-        "qr_data_uri": qr_data_uri,
     })
 
 
