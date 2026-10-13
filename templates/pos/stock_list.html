@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Raw Materials & Stock | Cafe POS{% endblock %}
+{% block eyebrow %}Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Raw Materials & Stock</h1>
+    <p>Track raw ingredients, milk, tea powder, sugar, gas cylinders, reorder levels, and days-of-cover.</p>
+  </div>
+  <div class="actions">
+    <a href="{% url 'stock_item_create' %}" class="btn btn-primary">+ Add Stock Item</a>
+    <a href="{% url 'purchase_create' %}" class="btn btn-outline">🛒 New Purchase</a>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: var(--space-5);">
+  <div class="card stat">
+    <div class="stat-label">Total Stock Items</div>
+    <div class="stat-value">{{ total_items_count }}</div>
+    <div class="stat-note">Tracked raw materials</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Low Stock Alerts</div>
+    <div class="stat-value" style="color: {% if low_stock_count > 0 %}var(--danger){% else %}var(--success){% endif %};">
+      {{ low_stock_count }}
+    </div>
+    <div class="stat-note">At or below reorder level</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Deficit / Negative Stock</div>
+    <div class="stat-value" style="color: {% if negative_stock_count > 0 %}#b91c1c{% else %}var(--success){% endif %};">
+      {{ negative_stock_count }}
+    </div>
+    <div class="stat-note">Items in negative inventory</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Total Inventory Value</div>
+    <div class="stat-value">₹{{ total_inventory_value|floatformat:2 }}</div>
+    <div class="stat-note">Based on last unit cost</div>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3); margin-bottom:var(--space-4);">
+    <div style="display:flex; gap:var(--space-2); align-items:center; flex-wrap:wrap;">
+      <a href="{% url 'stock_items' %}" class="btn {% if not low_stock_only and not negative_only and not query %}btn-primary{% else %}btn-outline{% endif %}" style="min-height:36px; padding:6px 14px; font-size:13px;">
+        All Items ({{ total_items_count }})
+      </a>
+      <a href="{% url 'stock_items' %}?filter=low" class="btn {% if low_stock_only %}btn-danger{% else %}btn-outline{% endif %}" style="min-height:36px; padding:6px 14px; font-size:13px;">
+        ⚠️ Low Stock Alerts ({{ low_stock_count }})
+      </a>
+      {% if negative_stock_count > 0 or negative_only %}
+      <a href="{% url 'stock_items' %}?filter=negative" class="btn {% if negative_only %}btn-danger{% else %}btn-outline{% endif %}" style="min-height:36px; padding:6px 14px; font-size:13px; color:#b91c1c; border-color:#fca5a5;">
+        🚨 Negative Stock ({{ negative_stock_count }})
+      </a>
+      {% endif %}
+    </div>
+
+    <form method="get" action="{% url 'stock_items' %}" class="actions" style="margin:0;">
+      {% if low_stock_only %}<input type="hidden" name="filter" value="low">{% endif %}
+      {% if negative_only %}<input type="hidden" name="filter" value="negative">{% endif %}
+      <input type="text" name="q" value="{{ query }}" placeholder="Search stock item..." style="min-width:200px; height:36px; padding:6px 12px; font-size:13px;">
+      <button type="submit" class="btn btn-outline" style="min-height:36px; padding:6px 14px; font-size:13px;">Search</button>
+      {% if query %}
+        <a href="{% url 'stock_items' %}{% if low_stock_only %}?filter=low{% elif negative_only %}?filter=negative{% endif %}" class="btn btn-soft" style="min-height:36px; padding:6px 12px; font-size:13px;">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Item Name</th>
+          <th>Unit</th>
+          <th>Current Quantity</th>
+          <th>Reorder Level</th>
+          <th>Cost / Unit</th>
+          <th>Days of Cover (7d)</th>
+          <th>Total Value</th>
+          <th>Status</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr style="{% if item.is_negative %}background:#fff1f2;{% elif item.is_low_stock %}background:#fff5f3;{% endif %}">
+          <td>
+            <b>{{ item.name }}</b>
+            {% if item.is_negative %}
+              <span class="pill pill-danger" style="background:#fee2e2; color:#b91c1c; font-size:10px; margin-left:4px;">Negative</span>
+            {% endif %}
+          </td>
+          <td><span class="pill pill-muted">{{ item.unit }}</span></td>
+          <td>
+            <b style="font-size:16px; color:{% if item.is_negative %}#b91c1c{% elif item.is_low_stock %}var(--danger){% else %}var(--ink){% endif %};">
+              {{ item.current_qty|floatformat:2 }}
+            </b> {{ item.unit }}
+          </td>
+          <td>{{ item.reorder_level|floatformat:2 }} {{ item.unit }}</td>
+          <td>₹{{ item.cost_per_unit|floatformat:2 }}</td>
+          <td>
+            {% if item.days_cover is not None %}
+              {% if item.days_cover <= 0 %}
+                <span class="pill pill-danger" style="background:#fee2e2; color:#b91c1c; font-weight:700;">0 days</span>
+              {% elif item.days_cover <= 2 %}
+                <span class="pill pill-danger" style="background:#fff1f2; color:#e11d48; font-weight:700;">{{ item.days_cover }} days ⚠️</span>
+              {% elif item.days_cover <= 5 %}
+                <span class="pill" style="background:#fef3c7; color:#b45309; font-weight:700;">{{ item.days_cover }} days</span>
+              {% else %}
+                <span class="pill pill-muted">{{ item.days_cover }} days</span>
+              {% endif %}
+              <div class="helptext" style="font-size:11px; margin-top:2px;">avg {{ item.daily_use|floatformat:2 }} {{ item.unit }}/day</div>
+            {% else %}
+              <span class="helptext" style="color:var(--muted);">— (No 7d use)</span>
+            {% endif %}
+          </td>
+          <td>₹{{ item.total_value|floatformat:2 }}</td>
+          <td>
+            {% if item.is_negative %}
+              <span class="pill pill-danger" style="background:#fee2e2; color:#b91c1c; font-weight:800;">🚨 Negative Stock</span>
+            {% elif item.is_low_stock %}
+              <span class="pill pill-danger" style="background:var(--danger-soft); color:var(--danger);">⚠️ Reorder Needed</span>
+            {% else %}
+              <span class="pill pill-success">Adequate</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <a href="{% url 'stock_item_edit' item.id %}" class="btn btn-outline" style="min-height:32px; padding:4px 10px; font-size:12px;">Edit</a>
+            <form method="post" action="{% url 'stock_item_delete' item.id %}" style="display:inline-block; margin:0;" onsubmit="return confirm('Delete stock item \'{{ item.name|escapejs }}\'?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline danger" style="min-height:32px; padding:4px 10px; font-size:12px; color:var(--danger); border-color:var(--danger-soft);">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" style="text-align:center; padding:var(--space-6); color:var(--muted);">
+            {% if low_stock_only %}
+              🎉 No low stock items! All raw materials are above reorder level.
+            {% elif negative_only %}
+              🎉 No negative stock items!
+            {% elif query %}
+              No stock items matched "{{ query }}".
+            {% else %}
+              No stock items added yet. Click "+ Add Stock Item" to start tracking raw materials.
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--line);">
+    <div class="helptext">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} items)</div>
+    <div class="actions">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if low_stock_only %}&filter=low{% elif negative_only %}&filter=negative{% endif %}{% if query %}&q={{ query }}{% endif %}" class="btn btn-outline" style="min-height:32px; padding:4px 12px; font-size:12px;">Previous</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if low_stock_only %}&filter=low{% elif negative_only %}&filter=negative{% endif %}{% if query %}&q={{ query }}{% endif %}" class="btn btn-outline" style="min-height:32px; padding:4px 12px; font-size:12px;">Next</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

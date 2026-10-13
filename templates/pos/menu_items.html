@@ -2,9 +2,536 @@
 {% block title %}Menu Items | Cafe POS{% endblock %}
 {% block eyebrow %}Menu / Catalog{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Menu Items</h1><p>Keep your café catalog current and billable.</p></div><a class="btn btn-primary" href="{% url 'menu_item_create' %}">+ Add Menu Item</a></div>
-<div class="card"><form method="get" class="actions"><input type="search" name="q" value="{{ query }}" placeholder="Search by item name" aria-label="Search menu items"><select name="category" aria-label="Filter by category"><option value="">All categories</option>{% for category in categories %}<option value="{{ category }}"{% if category == selected_category %} selected{% endif %}>{{ category }}</option>{% endfor %}</select><button type="submit" class="btn-primary">Filter</button>{% if query or selected_category %}<a class="btn btn-outline" href="{% url 'menu_items' %}">Clear</a>{% endif %}</form></div>
-<div class="card"><div class="table-wrap"><table class="data-table"><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Stock</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-{% for item in items %}<tr><td>{% if item.image %}<img src="{{ item.image.url }}" alt="{{ item.name }}" style="width:42px;height:42px;object-fit:cover;border-radius:10px;vertical-align:middle;margin-right:8px">{% endif %}<b>{{ item.name }}</b></td><td>{{ item.category }}</td><td><b>₹{{ item.price|floatformat:2 }}</b></td><td>{{ item.stock|floatformat:2 }}</td><td class="muted">{{ item.description|default:"-"|truncatechars:60 }}</td><td>{% if item.is_active %}<span class="pill pill-success">Active</span>{% else %}<span class="pill pill-muted">Inactive</span>{% endif %}</td><td><div class="actions"><a class="btn btn-soft" href="{% url 'menu_item_edit' item.id %}">Edit</a><form method="post" action="{% url 'menu_item_delete' item.id %}" onsubmit="return confirm('Delete this menu item?');">{% csrf_token %}<button type="submit" class="btn-danger">Delete</button></form></div></td></tr>{% empty %}<tr><td colspan="7" class="muted" style="text-align:center;padding:30px">No menu items found.</td></tr>{% endfor %}
-</tbody></table></div></div>
+<style>
+.toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn-star { background: none; border: none; font-size: 19px; cursor: pointer; padding: 2px 4px; line-height: 1; border-radius: 6px; transition: transform 0.15s; }
+.btn-star:hover { transform: scale(1.2); }
+.btn-star.active { color: #f59e0b; }
+.btn-star.inactive { color: #94a3b8; }
+.reorder-btns { display: inline-flex; flex-direction: column; gap: 2px; }
+.reorder-btn { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 1px 6px; font-size: 10px; cursor: pointer; line-height: 14px; min-height: 0; }
+.reorder-btn:hover { background: #e2e8f0; }
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal-box { background: var(--bg-card, #fff); border-radius: 12px; max-width: 560px; width: 90%; max-height: 85vh; overflow-y: auto; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); }
+.modal-box h3 { margin: 0 0 16px; font-size: 18px; font-weight: 800; }
+.modal-close { float: right; cursor: pointer; font-size: 20px; font-weight: bold; border: none; background: none; color: #64748b; }
+.bulk-preview-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+.bulk-preview-table th, .bulk-preview-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+.bulk-preview-table .price-new { color: #059669; font-weight: 700; }
+.bulk-bar { display: none; background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; align-items: center; justify-content: space-between; }
+.bulk-bar.active { display: flex; }
+</style>
+
+<div class="page-head">
+    <div>
+        <h1>Menu Items</h1>
+        <p>Keep your café catalog current and billable.</p>
+    </div>
+    <div class="toolbar-actions">
+        <a class="btn btn-primary" href="{% url 'menu_item_create' %}">+ Add Menu Item</a>
+        <a class="btn btn-outline" href="{% url 'modifier_create' %}">+ Add Modifier</a>
+        <a class="btn btn-soft" href="{% url 'menu_items_export_csv' %}">&#x21E9; Export CSV</a>
+        <button type="button" class="btn btn-soft" onclick="openModal('importModal')">&#x21E7; Import CSV</button>
+        <button type="button" class="btn btn-soft" onclick="openModal('categoryRenameModal')">&#x270E; Rename Category</button>
+        <button type="button" class="btn btn-soft" id="bulkPriceBtn" onclick="openBulkPriceModal()">&#x20B9; Bulk Price Edit</button>
+    </div>
+</div>
+
+<div class="card">
+    <form method="get" class="actions">
+        <input type="search" name="q" value="{{ query }}" placeholder="Search by item name" aria-label="Search menu items">
+        <select name="category" aria-label="Filter by category">
+            <option value="">All categories</option>
+            {% for category in categories %}
+            <option value="{{ category }}"{% if category == selected_category %} selected{% endif %}>{{ category }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn-primary">Filter</button>
+        {% if query or selected_category %}
+        <a class="btn btn-outline" href="{% url 'menu_items' %}">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<div id="bulkBar" class="bulk-bar">
+    <div>
+        <strong id="bulkSelectedCount">0</strong> items selected for bulk actions.
+    </div>
+    <div style="display:flex;gap:8px;">
+        <button type="button" class="btn btn-primary" onclick="openBulkPriceModal()">Edit Prices</button>
+        <button type="button" class="btn btn-soft" onclick="clearSelection()">Deselect All</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data-table" id="menuItemsTable">
+            <thead>
+                <tr>
+                    <th style="width:36px;"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" aria-label="Select all items"></th>
+                    <th style="width:50px;">Order</th>
+                    <th style="width:36px;">Fav</th>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Cost</th>
+                    <th>Stock</th>
+                    <th>Modifiers</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr data-id="{{ item.id }}" data-name="{{ item.name }}" data-price="{{ item.price }}">
+                    <td>
+                        <input type="checkbox" class="item-checkbox" value="{{ item.id }}" onchange="onItemSelectChange()" aria-label="Select {{ item.name }}">
+                    </td>
+                    <td>
+                        <div class="reorder-btns">
+                            <button type="button" class="reorder-btn" title="Move Up" onclick="reorderItem({{ item.id }}, 'up')">&#x25B2;</button>
+                            <button type="button" class="reorder-btn" title="Move Down" onclick="reorderItem({{ item.id }}, 'down')">&#x25BC;</button>
+                        </div>
+                    </td>
+                    <td>
+                        <button type="button" class="btn-star {% if item.is_favorite %}active{% else %}inactive{% endif %}" title="Toggle Favorite" onclick="toggleFavorite({{ item.id }}, this)">
+                            {% if item.is_favorite %}&#x2605;{% else %}&#x2606;{% endif %}
+                        </button>
+                    </td>
+                    <td>
+                        {% if item.image %}
+                        <img src="{{ item.image.url }}" alt="{{ item.name }}" style="width:36px;height:36px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-right:6px">
+                        {% endif %}
+                        <b>{{ item.name }}</b>
+                        {% if item.shortcut_key %}
+                        <span class="pill pill-soft" style="font-size:10px;padding:1px 5px;font-weight:700;margin-left:4px;">{{ item.shortcut_key }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.category|default:"Uncategorized" }}</td>
+                    <td class="muted">
+                        ₹{{ item.cost_price|floatformat:2 }}
+                        {% if item.has_recipe %}
+                        <span class="pill pill-soft" style="font-size:10px;padding:1px 4px;background:#dcfce7;color:#166534;" title="Derived from ingredient recipe">Recipe</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.stock|floatformat:2 }}</td>
+                    <td>
+                        {% for m in item.modifiers.all %}
+                        <span class="pill pill-soft" style="font-size:11px;margin:1px;">{{ m.name }}</span>
+                        {% empty %}
+                        <span class="muted" style="font-size:12px;">None</span>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% if item.is_active %}
+                        <span class="pill pill-success">Active</span>
+                        {% else %}
+                        <span class="pill pill-muted">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="actions" style="display:flex;gap:4px;flex-wrap:wrap;">
+                            <a class="btn btn-soft" style="min-height:32px;padding:2px 8px;font-size:12px;" href="{% url 'menu_item_edit' item.id %}">Edit</a>
+                            
+                            <form method="post" action="{% url 'menu_item_duplicate' item.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-soft" style="min-height:32px;padding:2px 8px;font-size:12px;" title="Duplicate item">Copy</button>
+                            </form>
+                            
+                            <form method="post" action="{% url 'menu_item_toggle_active' item.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn {% if item.is_active %}btn-outline{% else %}btn-primary{% endif %}" style="min-height:32px;padding:2px 8px;font-size:12px;">
+                                    {% if item.is_active %}Disable{% else %}Enable{% endif %}
+                                </button>
+                            </form>
+                            
+                            {% if item.sold_count == 0 %}
+                            <form method="post" action="{% url 'menu_item_delete' item.id %}" style="display:inline;" onsubmit="return confirm('Permanently delete {{ item.name }}?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-danger" style="min-height:32px;padding:2px 8px;font-size:12px;">Delete</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="11" class="muted" style="text-align:center;padding:30px">No menu items found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="margin-top:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div>
+            <h2 style="margin:0;font-size:20px;font-weight:900;">Modifiers & Add-ons</h2>
+            <p class="muted" style="margin:4px 0 0;font-size:13px;">Manage extra toppings, sizing, and special modifiers for menu items.</p>
+        </div>
+        <a class="btn btn-primary" href="{% url 'modifier_create' %}">+ Add Modifier</a>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Modifier Name</th>
+                    <th>Price Delta</th>
+                    <th>Status</th>
+                    <th>Linked Items</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for modifier in modifiers %}
+                <tr>
+                    <td><b>{{ modifier.name }}</b></td>
+                    <td><b>{% if modifier.price_delta >= 0 %}+{% endif %}₹{{ modifier.price_delta|floatformat:2 }}</b></td>
+                    <td>
+                        {% if modifier.is_active %}
+                        <span class="pill pill-success">Active</span>
+                        {% else %}
+                        <span class="pill pill-muted">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="muted">{{ modifier.products.count }} item{{ modifier.products.count|pluralize }}</td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-soft" href="{% url 'modifier_edit' modifier.id %}">Edit</a>
+                            <form method="post" action="{% url 'modifier_delete' modifier.id %}" onsubmit="return confirm('Delete this modifier?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-danger">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="muted" style="text-align:center;padding:24px;">No modifiers added yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Bulk Price Edit -->
+<div id="bulkPriceModal" class="modal-overlay">
+    <div class="modal-box">
+        <button type="button" class="modal-close" onclick="closeModal('bulkPriceModal')">&times;</button>
+        <h3>Bulk Price Edit</h3>
+        <p class="muted" style="font-size:13px;margin-top:0;">Update prices for <strong id="bulkModalCount">0</strong> selected items.</p>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0;">
+            <div>
+                <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">Change Type</label>
+                <select id="bulkChangeType" style="width:100%;padding:8px;border-radius:8px;border:1px solid #cbd5e1;">
+                    <option value="percent">Percentage (%)</option>
+                    <option value="flat">Flat Amount (₹)</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">Change Value (+ / -)</label>
+                <input type="text" id="bulkChangeValue" placeholder="e.g. 10 or -5" style="width:100%;padding:8px;border-radius:8px;border:1px solid #cbd5e1;">
+            </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <button type="button" class="btn btn-primary" onclick="previewBulkPrices()">Preview Changes</button>
+            <button type="button" class="btn btn-outline" onclick="closeModal('bulkPriceModal')">Cancel</button>
+        </div>
+
+        <div id="bulkError" style="display:none;color:#dc2626;background:#fee2e2;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:12px;"></div>
+
+        <div id="bulkPreviewContainer" style="display:none;">
+            <h4 style="margin:12px 0 6px;font-size:14px;">Price Preview</h4>
+            <div style="max-height:220px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
+                <table class="bulk-preview-table">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>Current Price</th>
+                            <th>New Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bulkPreviewRows"></tbody>
+                </table>
+            </div>
+            <div style="margin-top:16px;">
+                <button type="button" id="bulkApplyBtn" class="btn btn-primary" style="width:100%;" onclick="applyBulkPrices()">Confirm & Apply Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Category Rename -->
+<div id="categoryRenameModal" class="modal-overlay">
+    <div class="modal-box">
+        <button type="button" class="modal-close" onclick="closeModal('categoryRenameModal')">&times;</button>
+        <h3>Rename Category</h3>
+        <p class="muted" style="font-size:13px;margin-top:0;">Rename an entire category across all items in one action.</p>
+        <form method="post" action="{% url 'category_rename' %}">
+            {% csrf_token %}
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">Select Existing Category</label>
+                <select name="old_category" required style="width:100%;padding:8px;border-radius:8px;border:1px solid #cbd5e1;">
+                    <option value="">-- Choose Category --</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px;">New Category Name</label>
+                <input type="text" name="new_category" required placeholder="New category name" style="width:100%;padding:8px;border-radius:8px;border:1px solid #cbd5e1;">
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="submit" class="btn btn-primary">Rename Category</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('categoryRenameModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: CSV Import -->
+<div id="importModal" class="modal-overlay">
+    <div class="modal-box">
+        <button type="button" class="modal-close" onclick="closeModal('importModal')">&times;</button>
+        <h3>Import Menu Items from CSV</h3>
+        <p class="muted" style="font-size:13px;margin-top:0;">CSV columns: <code>name, category, price, cost, shortcut, active</code></p>
+        
+        <form id="importForm" method="post" action="{% url 'menu_items_import_csv' %}" enctype="multipart/form-data" onsubmit="handleImportSubmit(event)">
+            {% csrf_token %}
+            <div style="margin:16px 0;">
+                <input type="file" id="csvFileInput" name="csv_file" accept=".csv" required style="width:100%;padding:8px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc;">
+            </div>
+            <div id="importError" style="display:none;color:#dc2626;background:#fee2e2;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:12px;"></div>
+            <div style="display:flex;gap:8px;">
+                <button type="submit" id="importSubmitBtn" class="btn btn-primary">Upload & Import</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('importModal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form id="csrfTokenForm" style="display:none;">{% csrf_token %}</form>
+
+<script>
+function getCsrfToken() {
+    const el = document.querySelector('#csrfTokenForm [name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+}
+
+function openModal(id) {
+    document.getElementById(id).classList.add('open');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+}
+
+function toggleSelectAll(master) {
+    const checkboxes = document.querySelectorAll('.item-checkbox');
+    checkboxes.forEach(cb => cb.checked = master.checked);
+    onItemSelectChange();
+}
+
+function getSelectedIds() {
+    const checkboxes = document.querySelectorAll('.item-checkbox:checked');
+    return Array.from(checkboxes).map(cb => parseInt(cb.value));
+}
+
+function onItemSelectChange() {
+    const count = getSelectedIds().length;
+    const bar = document.getElementById('bulkBar');
+    const label = document.getElementById('bulkSelectedCount');
+    if (label) label.textContent = count;
+    if (bar) {
+        if (count > 0) bar.classList.add('active');
+        else bar.classList.remove('active');
+    }
+}
+
+function clearSelection() {
+    const master = document.getElementById('selectAllCheckbox');
+    if (master) master.checked = false;
+    toggleSelectAll({ checked: false });
+}
+
+function toggleFavorite(itemId, btn) {
+    fetch(`/menu-items/${itemId}/toggle-favorite/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            if (data.is_favorite) {
+                btn.classList.remove('inactive');
+                btn.classList.add('active');
+                btn.innerHTML = '&#x2605;';
+            } else {
+                btn.classList.remove('active');
+                btn.classList.add('inactive');
+                btn.innerHTML = '&#x2606;';
+            }
+        }
+    })
+    .catch(err => console.error(err));
+}
+
+function reorderItem(itemId, direction) {
+    fetch('/menu-items/reorder/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ item_id: itemId, direction: direction })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            window.location.reload();
+        }
+    })
+    .catch(err => console.error(err));
+}
+
+function openBulkPriceModal() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) {
+        alert('Please select at least one menu item checkbox first.');
+        return;
+    }
+    document.getElementById('bulkModalCount').textContent = ids.length;
+    document.getElementById('bulkError').style.display = 'none';
+    document.getElementById('bulkPreviewContainer').style.display = 'none';
+    openModal('bulkPriceModal');
+}
+
+function previewBulkPrices() {
+    const ids = getSelectedIds();
+    const changeType = document.getElementById('bulkChangeType').value;
+    const value = document.getElementById('bulkChangeValue').value.trim();
+    const errBox = document.getElementById('bulkError');
+    errBox.style.display = 'none';
+
+    if (!value) {
+        errBox.textContent = 'Please enter a change value.';
+        errBox.style.display = 'block';
+        return;
+    }
+
+    fetch('/menu-items/bulk-price/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            action: 'preview',
+            item_ids: ids,
+            change_type: changeType,
+            value: value
+        })
+    })
+    .then(r => r.json().then(data => ({ status: r.status, data })))
+    .then(({ status, data }) => {
+        if (status !== 200 || !data.ok) {
+            errBox.textContent = data.error || 'Failed to preview prices.';
+            errBox.style.display = 'block';
+            return;
+        }
+        const tbody = document.getElementById('bulkPreviewRows');
+        tbody.innerHTML = '';
+        data.preview.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><b>${row.name}</b></td><td>₹${parseFloat(row.old_price).toFixed(2)}</td><td class="price-new">₹${parseFloat(row.new_price).toFixed(2)}</td>`;
+            tbody.appendChild(tr);
+        });
+        document.getElementById('bulkPreviewContainer').style.display = 'block';
+    })
+    .catch(err => {
+        errBox.textContent = 'An error occurred while computing preview.';
+        errBox.style.display = 'block';
+    });
+}
+
+function applyBulkPrices() {
+    const ids = getSelectedIds();
+    const changeType = document.getElementById('bulkChangeType').value;
+    const value = document.getElementById('bulkChangeValue').value.trim();
+    const errBox = document.getElementById('bulkError');
+
+    fetch('/menu-items/bulk-price/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            action: 'apply',
+            item_ids: ids,
+            change_type: changeType,
+            value: value
+        })
+    })
+    .then(r => r.json().then(data => ({ status: r.status, data })))
+    .then(({ status, data }) => {
+        if (status !== 200 || !data.ok) {
+            errBox.textContent = data.error || 'Failed to apply prices.';
+            errBox.style.display = 'block';
+            return;
+        }
+        window.location.reload();
+    })
+    .catch(err => {
+        errBox.textContent = 'An error occurred while applying prices.';
+        errBox.style.display = 'block';
+    });
+}
+
+function handleImportSubmit(e) {
+    e.preventDefault();
+    const form = document.getElementById('importForm');
+    const formData = new FormData(form);
+    const errBox = document.getElementById('importError');
+    const submitBtn = document.getElementById('importSubmitBtn');
+    errBox.style.display = 'none';
+    submitBtn.disabled = true;
+
+    fetch(form.action, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(r => r.json().then(data => ({ status: r.status, data })))
+    .then(({ status, data }) => {
+        submitBtn.disabled = false;
+        if (status !== 200 || !data.ok) {
+            errBox.textContent = data.error || 'Import failed.';
+            errBox.style.display = 'block';
+            return;
+        }
+        window.location.reload();
+    })
+    .catch(err => {
+        submitBtn.disabled = false;
+        errBox.textContent = 'An unexpected error occurred during CSV import.';
+        errBox.style.display = 'block';
+    });
+}
+</script>
 {% endblock %}

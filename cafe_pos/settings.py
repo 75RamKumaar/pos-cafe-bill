@@ -33,6 +33,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -51,10 +52,12 @@ TEMPLATES = [{
             "django.template.context_processors.request",
             "django.contrib.auth.context_processors.auth",
             "django.contrib.messages.context_processors.messages",
+            "django.template.context_processors.i18n",
             "pos.context_processors.roles",
         ],
         "builtins": [
             "pos.templatetags.pos_tags",
+            "django.templatetags.i18n",
         ],
     },
 }]
@@ -86,10 +89,19 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "en"
 TIME_ZONE = "Asia/Kolkata"
 USE_I18N = True
 USE_TZ = True
+
+LANGUAGES = [
+    ("en", "English"),
+    ("ta", "Tamil"),
+]
+
+LOCALE_PATHS = [
+    BASE_DIR / "locale",
+]
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -103,12 +115,36 @@ STORAGES = {
     },
 }
 
+def whitenoise_custom_headers(headers, path, url):
+    if "sw.js" in url:
+        headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+
+def whitenoise_immutable_test(path, url):
+    if "sw.js" in url:
+        return False
+    import re
+    return bool(re.search(r"\.[0-9a-f]{12}\.", url))
+
+WHITENOISE_ADD_HEADERS_FUNCTION = whitenoise_custom_headers
+WHITENOISE_IMMUTABLE_FILE_TEST = whitenoise_immutable_test
+
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 12 * 60 * 60  # 12 hours
+SESSION_COOKIE_SAMESITE = "Lax"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "cafe-pos-cache",
+    }
+}
 
 DJANGO_HTTPS = config("DJANGO_HTTPS", default=False, cast=bool)
 if DJANGO_HTTPS:

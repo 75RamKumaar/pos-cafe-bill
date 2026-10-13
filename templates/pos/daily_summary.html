@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Daily Summary" %} | Cafe POS{% endblock %}
+{% block eyebrow %}{% trans "Reports / Daily Summary" %}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{% trans "Daily Summary" %}</h1>
+        <p>{% trans "Snapshot for" %} <b>{{ target_date|date:"l, d F Y" }}</b> {% if is_today %}<span class="pill pill-success" style="margin-left:6px;">{% trans "Today" %}</span>{% endif %}</p>
+    </div>
+    <div class="actions">
+        <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <label for="summaryDate" class="field-label" style="margin:0;font-size:13px;">{% trans "Date:" %}</label>
+            <input type="date" id="summaryDate" name="date" value="{{ target_date|date:'Y-m-d' }}" style="width:auto;min-width:160px;min-height:38px;height:38px;padding:6px 10px;" onchange="this.form.submit()">
+            <button type="submit" class="btn btn-outline" style="min-height:38px;height:38px;padding:0 14px;">{% trans "View" %}</button>
+            {% if not is_today %}
+            <a href="{% url 'daily_summary' %}" class="btn btn-soft" style="min-height:38px;height:38px;padding:0 12px;">{% trans "Today" %}</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="grid" style="margin-bottom:24px;">
+    <div class="card stat">
+        <div class="stat-label">{% trans "Sales" %}</div>
+        <div class="stat-value">₹{{ total_sales|floatformat:2 }}</div>
+        <div class="stat-note">{{ total_bills }} {% trans "completed bills" %}</div>
+    </div>
+    <div class="card stat">
+        <div class="stat-label">{% trans "Expenses" %}</div>
+        <div class="stat-value" style="color:var(--danger, #c63d3d);">₹{{ total_expenses|floatformat:2 }}</div>
+        <div class="stat-note">{% trans "Operating costs" %}</div>
+    </div>
+    <div class="card stat">
+        <div class="stat-label">{% trans "Net Profit" %}</div>
+        <div class="stat-value" style="color:{% if net_profit >= 0 %}var(--success, #16855b){% else %}var(--danger, #c63d3d){% endif %};">₹{{ net_profit|floatformat:2 }}</div>
+        <div class="stat-note">{% trans "Sales - COGS - Expenses" %}</div>
+    </div>
+    <div class="card stat">
+        <div class="stat-label">{% trans "Total Dues" %}</div>
+        <div class="stat-value" style="color:var(--warning, #a96b10);">₹{{ total_dues|floatformat:2 }}</div>
+        <div class="stat-note">Khata: ₹{{ customer_dues|floatformat:2 }} | Sup: ₹{{ supplier_dues|floatformat:2 }}</div>
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:20px;margin-bottom:24px;">
+    <!-- Payments Breakdown -->
+    <div class="card" style="margin-bottom:0;">
+        <h3 style="margin-top:0;margin-bottom:14px;">💳 {% trans "Payment Collection" %}</h3>
+        <div class="row">
+            <span>{% trans "Cash" %}</span>
+            <b>₹{{ cash_sales|floatformat:2 }}</b>
+        </div>
+        <div class="row">
+            <span>{% trans "UPI" %}</span>
+            <b>₹{{ upi_sales|floatformat:2 }}</b>
+        </div>
+        <div class="row">
+            <span>{% trans "Khata Credit" %}</span>
+            <b>₹{{ khata_sales|floatformat:2 }}</b>
+        </div>
+        <div class="row">
+            <span>{% trans "Card" %}</span>
+            <b>₹{{ card_sales|floatformat:2 }}</b>
+        </div>
+        <div class="row" style="font-weight:900;border-top:2px solid var(--line);margin-top:4px;padding-top:10px;">
+            <span>{% trans "Total Payments" %}</span>
+            <span style="color:var(--brand-strong);">₹{{ total_sales|floatformat:2 }}</span>
+        </div>
+    </div>
+
+    <!-- Profitability & Costs Breakdown -->
+    <div class="card" style="margin-bottom:0;">
+        <h3 style="margin-top:0;margin-bottom:14px;">📈 {% trans "P&L Breakdown" %}</h3>
+        <div class="row">
+            <span>{% trans "Gross Sales Revenue" %}</span>
+            <b>₹{{ total_sales|floatformat:2 }}</b>
+        </div>
+        <div class="row">
+            <span class="muted">{% trans "Cost of Goods (COGS)" %}</span>
+            <span class="muted">- ₹{{ total_cogs|floatformat:2 }}</span>
+        </div>
+        <div class="row">
+            <span class="muted">{% trans "Direct Expenses" %}</span>
+            <span class="muted">- ₹{{ total_expenses|floatformat:2 }}</span>
+        </div>
+        {% if wastage_cost > 0 %}
+        <div class="row">
+            <span class="muted">{% trans "Wastage Cost" %}</span>
+            <span class="muted">- ₹{{ wastage_cost|floatformat:2 }}</span>
+        </div>
+        {% endif %}
+        <div class="row" style="font-weight:900;border-top:2px solid var(--line);margin-top:4px;padding-top:10px;">
+            <span>{% trans "Estimated Net Profit" %}</span>
+            <span style="color:{% if net_profit >= 0 %}var(--success, #16855b){% else %}var(--danger, #c63d3d){% endif %}; font-size:18px;">
+                ₹{{ net_profit|floatformat:2 }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Top 3 Items -->
+    <div class="card" style="margin-bottom:0;">
+        <h3 style="margin-top:0;margin-bottom:14px;">🏆 {% trans "Top 3 Items" %}</h3>
+        {% if top_items %}
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            {% for item in top_items %}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface-muted);border-radius:var(--radius-sm);border:1px solid var(--line);">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="pill pill-success" style="font-size:12px;min-height:22px;padding:2px 7px;">#{{ item.rank }}</span>
+                    <b>{{ item.name }}</b>
+                </div>
+                <div style="text-align:right;">
+                    <div><b>{{ item.quantity }} {% trans "sold" %}</b></div>
+                    <small class="muted">₹{{ item.revenue|floatformat:2 }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:24px;">{% trans "No items sold on this day." %}</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Summary Text & Sharing Card -->
+<div class="card" style="margin-bottom:24px;">
+    <div class="row" style="padding-top:0;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+            <h3 style="margin:0 0 4px;">📋 {% trans "Summary Text & WhatsApp Dispatch" %}</h3>
+            <p class="muted" style="margin:0;font-size:13px;">{% trans "Formatted summary text ready to copy or send directly via WhatsApp to the owner's phone." %}</p>
+        </div>
+        <div class="actions" style="margin-top:0;">
+            <button type="button" id="copySummaryBtn" class="btn btn-primary" onclick="copySummaryText()">
+                📋 <span id="copySummaryLabel">{% trans "Copy summary" %}</span>
+            </button>
+            <a id="whatsappShareBtn" href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="border-color:#25d366;color:#128c7e;font-weight:900;">
+                <span style="font-size:17px;">💬</span> {% trans "Share via WhatsApp" %}
+            </a>
+        </div>
+    </div>
+
+    <div style="margin-top:16px;">
+        <label for="summaryTextarea" class="field-label">{% trans "Formatted Text Preview:" %}</label>
+        <textarea id="summaryTextarea" readonly rows="7" style="font-family:monospace;font-size:13px;line-height:1.5;background:var(--surface-muted);border-radius:var(--radius-sm);resize:vertical;">{{ summary_text }}</textarea>
+    </div>
+
+    {% if not owner_phone %}
+    <div class="alert alert-error" style="margin-top:12px;margin-bottom:0;font-size:13px;">
+        ⚠️ {% trans "Owner phone number is not configured in Settings. Go to" %} <a href="{% url 'settings' %}" style="text-decoration:underline;font-weight:700;">{% trans "Settings" %}</a> {% trans "to configure the phone number for 1-click WhatsApp messaging." %}
+    </div>
+    {% else %}
+    <div style="margin-top:10px;font-size:12px;color:var(--muted);">
+        {% trans "Owner phone in settings:" %} <code>{{ owner_phone }}</code>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Task Scheduler / Cron Documentation Card -->
+<div class="card" style="margin-bottom:24px;">
+    <h3 style="margin-top:0;margin-bottom:6px;">⏰ {% trans "Automated Scheduling Guide" %}</h3>
+    <p class="muted" style="margin:0 0 16px;font-size:13px;">
+        {% trans "To run automated database backups or scheduled routines nightly, configure your operating system's scheduler with the commands below." %}
+    </p>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:16px;">
+        <div style="padding:14px;background:var(--surface-muted);border-radius:var(--radius-sm);border:1px solid var(--line);">
+            <div style="font-weight:900;margin-bottom:6px;font-size:14px;">🐧 {% trans "Linux / macOS (Cron)" %}</div>
+            <p class="muted" style="margin:0 0 8px;font-size:12px;">{% trans "Add via 'crontab -e' to run daily at 11:00 PM:" %}</p>
+            <pre style="background:#20252b;color:#e3e8eb;padding:10px 12px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0;"><code>0 23 * * * cd /path/to/cafe_pos_django_v2 && .venv/bin/python manage.py backup_db</code></pre>
+        </div>
+
+        <div style="padding:14px;background:var(--surface-muted);border-radius:var(--radius-sm);border:1px solid var(--line);">
+            <div style="font-weight:900;margin-bottom:6px;font-size:14px;">🪟 {% trans "Windows (Task Scheduler)" %}</div>
+            <p class="muted" style="margin:0 0 8px;font-size:12px;">{% trans "Run in Administrator PowerShell or Command Prompt to create a 23:00 daily task:" %}</p>
+            <pre style="background:#20252b;color:#e3e8eb;padding:10px 12px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0;"><code>schtasks /create /tn "CafePOS_DailyBackup" /tr "\"{{ request.META.VIRTUAL_ENV|default:'C:\cafe_pos_django_v2\.venv' }}\Scripts\python.exe\" \"C:\cafe_pos_django_v2\manage.py\" backup_db" /sc daily /st 23:00</code></pre>
+        </div>
+    </div>
+</div>
+
+<script>
+function copySummaryText() {
+    const textarea = document.getElementById('summaryTextarea');
+    if (!textarea) return;
+    textarea.select();
+    textarea.setSelectionRange(0, 99999);
+    
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textarea.value).then(() => {
+            showCopyFeedback();
+        }).catch(() => {
+            document.execCommand('copy');
+            showCopyFeedback();
+        });
+    } else {
+        document.execCommand('copy');
+        showCopyFeedback();
+    }
+}
+
+function showCopyFeedback() {
+    const label = document.getElementById('copySummaryLabel');
+    const btn = document.getElementById('copySummaryBtn');
+    if (!label) return;
+    const oldText = label.textContent;
+    label.textContent = '{% trans "Copied!" %}';
+    btn.classList.add('btn-success');
+    btn.classList.remove('btn-primary');
+    setTimeout(() => {
+        label.textContent = oldText;
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-primary');
+    }, 2500);
+}
+</script>
+{% endblock %}
+

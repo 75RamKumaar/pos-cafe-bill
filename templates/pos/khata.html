@@ -1,24 +1,262 @@
 {% extends "base.html" %}
-{% block title %}Khata | Cafe POS{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Khata Accounts" %} | Cafe POS{% endblock %}
+{% block eyebrow %}{% trans "Khata / Customer Ledger" %}{% endblock %}
 {% block content %}
-<h2>Khata Accounts</h2>
-<p class="muted">Track credit sales and payments separately from today's sales.</p>
+<style>
+.khata-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.khata-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.ageing-pill { display: inline-block; padding: 2px 6px; font-size: 11px; font-weight: 700; border-radius: 6px; }
+.ageing-0-30 { background: #dcfce7; color: #15803d; }
+.ageing-31-60 { background: #fef9c3; color: #854d0e; }
+.ageing-61-90 { background: #ffedd5; color: #c2410c; }
+.ageing-90-plus { background: #fee2e2; color: #b91c1c; }
+.ageing-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 11px; min-width: 220px; }
+.ageing-cell { text-align: center; padding: 3px 4px; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0; }
+.ageing-cell span { display: block; font-size: 9px; color: #64748b; font-weight: 700; text-transform: uppercase; }
+.ageing-cell b { display: block; font-size: 11px; }
 
-{% for c in customers %}
+/* Payment Drawer Modal */
+.drawer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+.drawer-overlay.open { display: flex; }
+.drawer-content { background: var(--bg-card, #fff); border-radius: 12px; max-width: 460px; width: 92%; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
+.drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; }
+.method-choices { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 10px 0 16px; }
+.method-label { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 6px; border: 2px solid #cbd5e1; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; transition: all 0.15s; background: #f8fafc; }
+.method-choices input[type="radio"] { display: none; }
+.method-choices input[type="radio"]:checked + .method-label { border-color: var(--primary, #0284c7); background: #e0f2fe; color: #0369a1; }
+.toast-notice { display: none; position: fixed; bottom: 24px; right: 24px; background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); z-index: 2000; font-size: 14px; font-weight: 600; }
+</style>
+
+<div class="page-head">
+    <div>
+        <h1>{% trans "Khata Accounts" %}</h1>
+        <p>{% trans "Track credit customers, outstanding balances, and aging debts." %}</p>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;">
+        <div class="pill pill-soft" style="font-size:14px;padding:6px 14px;">
+            {% trans "Total Outstanding:" %} <b>₹{{ total_outstanding|floatformat:2 }}</b>
+        </div>
+        <a href="{% url 'customer_create' %}" class="btn btn-primary">+ {% trans "Add Customer" %}</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+    <form method="get" class="khata-toolbar" style="margin:0;">
+        <div class="khata-filters">
+            <input type="search" name="q" value="{{ query }}" placeholder="{% trans 'Search by name or phone...' %}" aria-label="{% trans 'Search Khata customers' %}" style="min-width:240px;">
+            
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;user-select:none;background:#f8fafc;padding:6px 12px;border-radius:8px;border:1px solid #cbd5e1;">
+                <input type="checkbox" name="has_dues" value="1" {% if has_dues %}checked{% endif %} onchange="this.form.submit()" style="width:16px;height:16px;">
+                {% trans "Only with dues" %}
+            </label>
+
+            <select name="sort" onchange="this.form.submit()" aria-label="{% trans 'Sort by' %}" style="padding:6px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:13px;">
+                <option value="amount" {% if selected_sort == 'amount' or not selected_sort %}selected{% endif %}>{% trans "Highest Dues First" %}</option>
+                <option value="amount_asc" {% if selected_sort == 'amount_asc' %}selected{% endif %}>{% trans "Lowest Dues First" %}</option>
+                <option value="oldest_due" {% if selected_sort == 'oldest_due' %}selected{% endif %}>{% trans "Oldest Due Date First" %}</option>
+                <option value="name" {% if selected_sort == 'name' %}selected{% endif %}>{% trans "Name (A-Z)" %}</option>
+            </select>
+
+            <button type="submit" class="btn btn-primary" style="min-height:36px;padding:4px 14px;font-size:13px;">{% trans "Filter" %}</button>
+            {% if query or has_dues or selected_sort %}
+            <a href="{% url 'khata' %}" class="btn btn-outline" style="min-height:36px;padding:4px 12px;font-size:13px;">{% trans "Reset" %}</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
 <div class="card">
-<div class="row">
-<div><h3>{{c.name}}</h3><span class="muted">{{c.phone}}</span></div>
-<div style="text-align:right"><small>Outstanding</small><h2>₹{{c.balance|floatformat:2}}</h2></div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>{% trans "Customer" %}</th>
+                    <th>{% trans "Contact" %}</th>
+                    <th>{% trans "Limit" %}</th>
+                    <th style="text-align:right;">{% trans "Outstanding" %}</th>
+                    <th style="min-width:230px;">{% trans "FIFO Ageing Breakdown" %}</th>
+                    <th style="text-align:center;">{% trans "Actions" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in customers %}
+                <tr>
+                    <td>
+                        <a href="{% url 'customer_detail' c.id %}" style="font-weight:800;color:inherit;text-decoration:none;">{{ c.name }}</a>
+                    </td>
+                    <td class="muted">{{ c.phone|default:"-" }}</td>
+                    <td>
+                        {% if c.credit_limit is not None %}
+                        <span class="pill pill-soft" style="font-size:11px;">₹{{ c.credit_limit|floatformat:2 }}</span>
+                        {% else %}
+                        <span class="muted" style="font-size:11px;">{% trans "No limit" %}</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:right;">
+                        <b style="font-size:15px;{% if c.balance > 0 %}color:#dc2626;{% else %}color:#16a34a;{% endif %}">
+                            ₹{{ c.balance|floatformat:2 }}
+                        </b>
+                    </td>
+                    <td>
+                        <div class="ageing-grid">
+                            <div class="ageing-cell {% if c.ageing.b_0_30 > 0 %}ageing-0-30{% endif %}">
+                                <span>0-30d</span>
+                                <b>₹{{ c.ageing.b_0_30|floatformat:0 }}</b>
+                            </div>
+                            <div class="ageing-cell {% if c.ageing.b_31_60 > 0 %}ageing-31-60{% endif %}">
+                                <span>31-60d</span>
+                                <b>₹{{ c.ageing.b_31_60|floatformat:0 }}</b>
+                            </div>
+                            <div class="ageing-cell {% if c.ageing.b_61_90 > 0 %}ageing-61-90{% endif %}">
+                                <span>61-90d</span>
+                                <b>₹{{ c.ageing.b_61_90|floatformat:0 }}</b>
+                            </div>
+                            <div class="ageing-cell {% if c.ageing.b_90_plus > 0 %}ageing-90-plus{% endif %}">
+                                <span>90+d</span>
+                                <b>₹{{ c.ageing.b_90_plus|floatformat:0 }}</b>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="text-align:center;">
+                        <div class="actions" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+                            {% if c.balance > 0 %}
+                            <button type="button" class="btn btn-primary" style="min-height:30px;padding:2px 10px;font-size:12px;" onclick="openPaymentDrawer('{{ c.id }}', '{{ c.name|escapejs }}', '{{ c.balance|floatformat:2 }}')">
+                                {% trans "Pay" %}
+                            </button>
+                            {% endif %}
+                            
+                            <a href="{% url 'khata_statement' c.id %}" class="btn btn-soft" style="min-height:30px;padding:2px 10px;font-size:12px;" title="{% trans 'Statement' %}">
+                                {% trans "Statement" %}
+                            </a>
+
+                            {% if c.balance > 0 %}
+                            <button type="button" class="btn btn-soft" style="min-height:30px;padding:2px 8px;font-size:12px;" onclick="copyReminder('{{ c.name|escapejs }}', '{{ c.phone|escapejs }}', '{{ c.balance|floatformat:2 }}', '{{ business_settings.name|default:'Cafe POS'|escapejs }}')" title="{% trans 'Reminder' %}">
+                                📋 {% trans "Reminder" %}
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="muted" style="text-align:center;padding:36px;">
+                        {% trans "No Khata customers match the current criteria." %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 8px 4px;font-size:13px;">
+        <span class="muted">{% blocktrans with page_num=page_obj.number total_pages=page_obj.paginator.num_pages total_count=page_obj.paginator.count %}Page {{ page_num }} of {{ total_pages }} ({{ total_count }} customers){% endblocktrans %}</span>
+        <div style="display:flex;gap:6px;">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if has_dues %}&has_dues=1{% endif %}{% if selected_sort %}&sort={{ selected_sort }}{% endif %}" class="btn btn-outline" style="min-height:32px;padding:2px 10px;">&larr; {% trans "Prev" %}</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if has_dues %}&has_dues=1{% endif %}{% if selected_sort %}&sort={{ selected_sort }}{% endif %}" class="btn btn-outline" style="min-height:32px;padding:2px 10px;">{% trans "Next" %} &rarr;</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
-<form method="post" action="/khata/{{c.id}}/pay/" class="actions">
-{% csrf_token %}
-<input name="amount" type="number" min="0.01" step="0.01" placeholder="Payment amount" required>
-<input name="note" placeholder="Note (optional)">
-<button class="cash">Receive Payment</button>
-</form>
+<!-- Payment Drawer / Modal -->
+<div id="paymentDrawer" class="drawer-overlay">
+    <div class="drawer-content">
+        <div class="drawer-header">
+            <div>
+                <h3 id="drawerCustomerName" style="margin:0;font-size:18px;font-weight:900;">{% trans "Receive Payment" %}</h3>
+                <span class="muted" style="font-size:13px;">{% trans "Outstanding:" %} <b id="drawerOutstanding" style="color:#dc2626;">₹0.00</b></span>
+            </div>
+            <button type="button" class="btn btn-soft" style="min-height:32px;padding:2px 10px;font-size:14px;" onclick="closePaymentDrawer()">&times;</button>
+        </div>
+
+        <form id="paymentDrawerForm" method="post" action="">
+            {% csrf_token %}
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">{% trans "Payment Amount (₹) *" %}</label>
+                <input type="number" id="drawerAmount" name="amount" step="0.01" min="0.01" required style="width:100%;font-size:18px;font-weight:800;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;">
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">{% trans "Payment Method *" %}</label>
+                <div class="method-choices">
+                    <input type="radio" id="m_cash" name="method" value="CASH" checked required>
+                    <label for="m_cash" class="method-label">
+                        <span>💵 {% trans "Cash" %}</span>
+                    </label>
+
+                    <input type="radio" id="m_upi" name="method" value="UPI" required>
+                    <label for="m_upi" class="method-label">
+                        <span>📱 {% trans "UPI" %}</span>
+                    </label>
+
+                    <input type="radio" id="m_card" name="method" value="CARD" required>
+                    <label for="m_card" class="method-label">
+                        <span>💳 {% trans "Card" %}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px;">{% trans "Note (Optional)" %}</label>
+                <input type="text" name="note" placeholder="{% trans 'e.g. Cleared pending dues' %}" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">
+            </div>
+
+            <div style="display:flex;gap:8px;">
+                <button type="submit" class="btn btn-primary" style="flex:1;">{% trans "Confirm & Receive" %}</button>
+                <button type="button" class="btn btn-outline" onclick="closePaymentDrawer()">{% trans "Cancel" %}</button>
+            </div>
+        </form>
+    </div>
 </div>
-{% empty %}
-<div class="empty-state"><b>No Khata customers yet</b><br><span>Add a customer to start tracking credit balances.</span></div>
-{% endfor %}
+
+<div id="toastNotice" class="toast-notice">{% trans "Reminder message copied to clipboard!" %}</div>
+
+<script>
+function openPaymentDrawer(customerId, customerName, balance) {
+    const form = document.getElementById('paymentDrawerForm');
+    form.action = `/khata/${customerId}/pay/`;
+    document.getElementById('drawerCustomerName').textContent = customerName;
+    document.getElementById('drawerOutstanding').textContent = '₹' + parseFloat(balance).toFixed(2);
+    const amountInput = document.getElementById('drawerAmount');
+    amountInput.value = parseFloat(balance).toFixed(2);
+    amountInput.max = parseFloat(balance).toFixed(2);
+    document.getElementById('paymentDrawer').classList.add('open');
+}
+
+function closePaymentDrawer() {
+    document.getElementById('paymentDrawer').classList.remove('open');
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toastNotice');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+function copyReminder(customerName, phone, balance, shopName) {
+    const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+    const amountStr = parseFloat(balance).toFixed(2);
+    const msg = `Dear ${customerName}, your outstanding balance at ${shopName} is ₹${amountStr}. Kindly clear the dues at your earliest convenience. Thank you!`;
+    const waLink = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}` : '';
+    const fullText = cleanPhone ? `${msg}\nWhatsApp link: ${waLink}` : msg;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(fullText).then(() => {
+            showToast('Reminder & WhatsApp link copied to clipboard!');
+        }).catch(() => {
+            prompt('Copy reminder text:', fullText);
+        });
+    } else {
+        prompt('Copy reminder text:', fullText);
+    }
+}
+</script>
 {% endblock %}

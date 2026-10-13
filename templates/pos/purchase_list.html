@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Purchases & Inward Stock | Cafe POS{% endblock %}
+{% block eyebrow %}Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Purchases & Inward Stock</h1>
+    <p>Record raw material purchases from suppliers, increase stock levels, and track payment dues.</p>
+  </div>
+  <div class="actions">
+    <a href="{% url 'purchase_create' %}" class="btn btn-primary">+ New Purchase</a>
+    <a href="{% url 'stock_items' %}" class="btn btn-outline">📦 Stock Items</a>
+    <a href="{% url 'suppliers' %}" class="btn btn-outline">🏭 Suppliers</a>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: var(--space-5);">
+  <div class="card stat">
+    <div class="stat-label">Total Purchases</div>
+    <div class="stat-value">₹{{ total_purchase_amount|floatformat:2 }}</div>
+    <div class="stat-note">Filtered purchase total</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Total Paid</div>
+    <div class="stat-value" style="color:var(--success);">₹{{ total_paid_amount|floatformat:2 }}</div>
+    <div class="stat-note">Payments completed</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Outstanding Dues</div>
+    <div class="stat-value" style="color:{% if total_due_amount > 0 %}var(--danger){% else %}var(--ink){% endif %};">
+      ₹{{ total_due_amount|floatformat:2 }}
+    </div>
+    <div class="stat-note">Payable to suppliers</div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="{% url 'purchases' %}" class="actions" style="margin-bottom:var(--space-4); display:flex; flex-wrap:wrap; gap:var(--space-3); align-items:flex-end;">
+    <div>
+      <label class="field-label" style="margin-bottom:4px;">Supplier</label>
+      <select name="supplier" style="height:38px; min-width:180px;">
+        <option value="">All Suppliers</option>
+        {% for s in suppliers %}
+          <option value="{{ s.id }}" {% if selected_supplier == s.id|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="field-label" style="margin-bottom:4px;">From Date</label>
+      <input type="date" name="from_date" value="{{ from_date }}" style="height:38px;">
+    </div>
+
+    <div>
+      <label class="field-label" style="margin-bottom:4px;">To Date</label>
+      <input type="date" name="to_date" value="{{ to_date }}" style="height:38px;">
+    </div>
+
+    <div>
+      <label class="field-label" style="margin-bottom:4px;">Payment Method</label>
+      <select name="method" style="height:38px; min-width:140px;">
+        <option value="">All Methods</option>
+        <option value="CASH" {% if selected_method == "CASH" %}selected{% endif %}>Cash</option>
+        <option value="UPI" {% if selected_method == "UPI" %}selected{% endif %}>UPI</option>
+        <option value="CARD" {% if selected_method == "CARD" %}selected{% endif %}>Card</option>
+        <option value="BANK" {% if selected_method == "BANK" %}selected{% endif %}>Bank</option>
+        <option value="CREDIT" {% if selected_method == "CREDIT" %}selected{% endif %}>Credit / Due</option>
+      </select>
+    </div>
+
+    <div style="padding-bottom:8px;">
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; font-weight:700;">
+        <input type="checkbox" name="due_only" value="1" {% if due_only %}checked{% endif %} style="width:18px; height:18px;">
+        Only with Dues
+      </label>
+    </div>
+
+    <button type="submit" class="btn btn-outline" style="min-height:38px; padding:0 14px;">Filter</button>
+    {% if selected_supplier or from_date or to_date or selected_method or due_only %}
+      <a href="{% url 'purchases' %}" class="btn btn-soft" style="min-height:38px; padding:0 12px;">Clear</a>
+    {% endif %}
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Date</th>
+          <th>Supplier</th>
+          <th>Items Purchased</th>
+          <th>Total Cost</th>
+          <th>Paid</th>
+          <th>Due</th>
+          <th>Method</th>
+          <th>Status</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in purchases %}
+        <tr>
+          <td><b>#{{ p.id }}</b></td>
+          <td>{{ p.date|date:"d M Y" }}</td>
+          <td>
+            <a href="{% url 'supplier_detail' p.supplier.id %}" style="font-weight:700; color:var(--brand-strong);">
+              {{ p.supplier.name }}
+            </a>
+          </td>
+          <td>
+            <div style="font-size:13px;">
+              {% for l in p.lines.all %}
+                <span>{{ l.stock_item.name }} ({{ l.qty|floatformat:2 }} {{ l.stock_item.unit }})</span>{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                <span class="muted">No items</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td><b>₹{{ p.total_amount|floatformat:2 }}</b></td>
+          <td style="color:var(--success);">₹{{ p.paid_amount|floatformat:2 }}</td>
+          <td>
+            {% if p.due_amount > 0 %}
+              <b style="color:var(--danger);">₹{{ p.due_amount|floatformat:2 }}</b>
+            {% else %}
+              <span class="muted">₹0.00</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="pill pill-muted">{{ p.get_method_display }}</span>
+            {% if p.expense %}
+              <span class="pill pill-success" title="Linked to Cash Drawer Expense #{{ p.expense.id }}">Drawer Paid</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.due_amount <= 0 %}
+              <span class="pill pill-success">Paid</span>
+            {% elif p.paid_amount > 0 %}
+              <span class="pill pill-muted" style="background:var(--warning-soft); color:var(--warning);">Partial</span>
+            {% else %}
+              <span class="pill pill-danger" style="background:var(--danger-soft); color:var(--danger);">Due</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            <a href="{% url 'purchase_detail' p.id %}" class="btn btn-outline" style="min-height:32px; padding:4px 10px; font-size:12px;">View</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10" style="text-align:center; padding:var(--space-6); color:var(--muted);">
+            No purchases found. Click "+ New Purchase" to record inward stock.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--line);">
+    <div class="helptext">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} purchases)</div>
+    <div class="actions">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if selected_supplier %}&supplier={{ selected_supplier }}{% endif %}{% if from_date %}&from_date={{ from_date }}{% endif %}{% if to_date %}&to_date={{ to_date }}{% endif %}{% if selected_method %}&method={{ selected_method }}{% endif %}{% if due_only %}&due_only=1{% endif %}" class="btn btn-outline" style="min-height:32px; padding:4px 12px; font-size:12px;">Previous</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if selected_supplier %}&supplier={{ selected_supplier }}{% endif %}{% if from_date %}&from_date={{ from_date }}{% endif %}{% if to_date %}&to_date={{ to_date }}{% endif %}{% if selected_method %}&method={{ selected_method }}{% endif %}{% if due_only %}&due_only=1{% endif %}" class="btn btn-outline" style="min-height:32px; padding:4px 12px; font-size:12px;">Next</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+

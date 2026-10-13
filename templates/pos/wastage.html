@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Wastage & Loss Tracking | Cafe POS{% endblock %}
+{% block eyebrow %}Inventory & Cost Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Wastage & Loss Tracking</h1>
+    <p>Record kitchen waste, expired goods, spills, and stock loss with real-time inventory deductions.</p>
+  </div>
+  <div class="actions">
+    <a href="#log-wastage-card" class="btn btn-primary" onclick="document.getElementById('wastage-qty-input')?.focus();">+ Log Wastage</a>
+    {% if is_owner %}
+    <a href="{% url 'reports' %}?tab=profit" class="btn btn-outline">▥ Profit & Loss Report</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: var(--space-5);">
+  <div class="card stat">
+    <div class="stat-label">Total Wastage Cost</div>
+    <div class="stat-value" style="color: var(--danger);">{{ business_settings.currency_symbol }}{{ total_cost|floatformat:2 }}</div>
+    <div class="stat-note">Cost snapshot of wasted goods</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Total Quantity Wasted</div>
+    <div class="stat-value">{{ total_qty|floatformat:2 }}</div>
+    <div class="stat-note">Combined units & raw material measures</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Total Log Entries</div>
+    <div class="stat-value">{{ total_count }}</div>
+    <div class="stat-note">Audit-logged wastage rows</div>
+  </div>
+</div>
+
+<!-- Log Wastage Card -->
+<div class="card" id="log-wastage-card" style="margin-bottom: var(--space-5); border-left: 4px solid var(--danger);">
+  <div class="row" style="padding-top:0; margin-bottom: var(--space-3);">
+    <div>
+      <h3 style="margin-bottom:4px;">Record Wastage Entry</h3>
+      <span class="muted">Deducts inventory immediately. Records cannot be deleted; owners may log negative correction entries.</span>
+    </div>
+  </div>
+
+  <form method="post" action="{% url 'wastage_create' %}" id="wastageForm">
+    {% csrf_token %}
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-3);">
+      
+      <!-- Type Switcher -->
+      <div style="grid-column: 1 / -1;">
+        <label style="font-weight: 700; margin-bottom: 6px; display: block; font-size: 13px;">Item Category:</label>
+        <div style="display: flex; gap: var(--space-3);">
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px;">
+            <input type="radio" name="item_category_type" value="product" id="radioTypeProduct" checked onchange="toggleItemType()">
+            <b>Finished Menu Product</b> (e.g. Cold Coffee, Sandwich)
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px;">
+            <input type="radio" name="item_category_type" value="stock_item" id="radioTypeStock" onchange="toggleItemType()">
+            <b>Raw Material / Stock Item</b> (e.g. Milk, Sugar, Tea Powder)
+          </label>
+        </div>
+      </div>
+
+      <!-- Product Select -->
+      <div id="product-group">
+        <label for="{{ form.product.id_for_label }}" style="font-weight:700; font-size:13px; display:block; margin-bottom:4px;">
+          Menu Product <span style="color:var(--danger)">*</span>
+        </label>
+        {{ form.product }}
+        <span class="muted" style="font-size:11px;">Deducts finished stock or recipe ingredients</span>
+      </div>
+
+      <!-- Stock Item Select -->
+      <div id="stock-group" style="display: none;">
+        <label for="{{ form.stock_item.id_for_label }}" style="font-weight:700; font-size:13px; display:block; margin-bottom:4px;">
+          Raw Material Stock Item <span style="color:var(--danger)">*</span>
+        </label>
+        {{ form.stock_item }}
+        <span class="muted" style="font-size:11px;">Deducts raw material inventory directly</span>
+      </div>
+
+      <!-- Quantity -->
+      <div>
+        <label for="{{ form.quantity.id_for_label }}" style="font-weight:700; font-size:13px; display:block; margin-bottom:4px;">
+          Quantity <span style="color:var(--danger)">*</span>
+        </label>
+        {{ form.quantity }}
+        <span class="muted" style="font-size:11px;">
+          {% if is_owner %}Enter positive amount, or negative for correction{% else %}Enter positive quantity{% endif %}
+        </span>
+      </div>
+
+      <!-- Reason -->
+      <div>
+        <label for="{{ form.reason.id_for_label }}" style="font-weight:700; font-size:13px; display:block; margin-bottom:4px;">
+          Reason <span style="color:var(--danger)">*</span>
+        </label>
+        {{ form.reason }}
+        <span class="muted" style="font-size:11px;">Categorizes loss for profit reporting</span>
+      </div>
+
+      <!-- Note -->
+      <div style="grid-column: 1 / -1;">
+        <label for="{{ form.note.id_for_label }}" style="font-weight:700; font-size:13px; display:block; margin-bottom:4px;">
+          Optional Notes / Reason Details
+        </label>
+        {{ form.note }}
+      </div>
+
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: var(--space-2);">
+      <button type="submit" class="btn btn-primary" style="min-width: 160px;">Record Wastage</button>
+    </div>
+  </form>
+</div>
+
+<!-- History & Filters Card -->
+<div class="card">
+  <!-- Filter Toolbar -->
+  <form method="get" action="{% url 'wastage' %}" style="margin-bottom: var(--space-4);">
+    <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; justify-content: space-between;">
+      
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center;">
+        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search item or note..." style="min-width: 180px; max-width: 240px; height: 38px;">
+        
+        <select name="reason" style="height: 38px; min-width: 160px;">
+          <option value="">-- All Reasons --</option>
+          {% for code, label in reason_choices %}
+          <option value="{{ code }}" {% if selected_reason == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+
+        <select name="item_type" style="height: 38px; min-width: 140px;">
+          <option value="">-- All Types --</option>
+          <option value="product" {% if selected_item_type == 'product' %}selected{% endif %}>Products</option>
+          <option value="stock_item" {% if selected_item_type == 'stock_item' %}selected{% endif %}>Raw Materials</option>
+        </select>
+
+        <input type="date" name="from_date" value="{% if from_date %}{{ from_date|date:'Y-m-d' }}{% endif %}" title="From date" style="height: 38px;">
+        <input type="date" name="to_date" value="{% if to_date %}{{ to_date|date:'Y-m-d' }}{% endif %}" title="To date" style="height: 38px;">
+
+        <button type="submit" class="btn btn-primary" style="height: 38px; padding: 0 16px;">Filter</button>
+        {% if query or selected_reason or selected_item_type or from_date or to_date %}
+        <a href="{% url 'wastage' %}" class="btn btn-outline" style="height: 38px; padding: 0 14px; display: inline-flex; align-items: center;">Reset</a>
+        {% endif %}
+      </div>
+
+      <div class="muted" style="font-size: 13px;">
+        Showing {{ page_obj.start_index|default:0 }}–{{ page_obj.end_index|default:0 }} of {{ page_obj.paginator.count }} records
+      </div>
+
+    </div>
+  </form>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date & Time</th>
+          <th>Item</th>
+          <th>Type</th>
+          <th>Reason</th>
+          <th style="text-align:right;">Quantity</th>
+          <th style="text-align:right;">Cost Snapshot</th>
+          <th>Recorded By</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in page_obj %}
+        <tr>
+          <td><b>{{ row.created_at|date:"d M Y, H:i" }}</b></td>
+          <td>
+            <b>{{ row.item_name }}</b>
+          </td>
+          <td>
+            {% if row.product %}
+            <span class="pill pill-muted" style="font-size: 11px;">Product</span>
+            {% else %}
+            <span class="pill pill-success" style="font-size: 11px;">Raw Material</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.reason == 'CORRECTION' or row.is_correction %}
+            <span class="pill" style="background:#e0e7ff; color:#3730a3; font-weight:700;">Correction</span>
+            {% elif row.reason == 'EXPIRED' %}
+            <span class="pill pill-danger">Expired</span>
+            {% elif row.reason == 'SPILLED' %}
+            <span class="pill" style="background:#fef3c7; color:#92400e;">Spilled</span>
+            {% elif row.reason == 'RETURNED' %}
+            <span class="pill" style="background:#fce7f3; color:#9d174d;">Returned</span>
+            {% elif row.reason == 'STAFF' %}
+            <span class="pill" style="background:#e0f2fe; color:#0369a1;">Staff</span>
+            {% else %}
+            <span class="pill pill-muted">Other</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right; font-weight:700; {% if row.quantity < 0 %}color:var(--success);{% else %}color:var(--ink);{% endif %}">
+            {{ row.quantity|floatformat:2 }} {{ row.unit }}
+          </td>
+          <td style="text-align:right; font-weight:700; {% if row.cost < 0 %}color:var(--success);{% else %}color:var(--danger);{% endif %}">
+            {{ business_settings.currency_symbol }}{{ row.cost|floatformat:2 }}
+          </td>
+          <td>
+            {% if row.recorded_by %}
+            <span style="font-size:13px;">{{ row.recorded_by.username }}</span>
+            {% else %}
+            <span class="muted">-</span>
+            {% endif %}
+          </td>
+          <td style="max-width:240px; font-size:13px; color:var(--muted);">
+            {{ row.note|default:"-" }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="muted" style="text-align:center; padding: 40px;">
+            No wastage records found matching the criteria.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div style="display:flex; justify-content:center; gap:var(--space-2); margin-top:var(--space-4);">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if selected_reason %}&reason={{ selected_reason }}{% endif %}{% if selected_item_type %}&item_type={{ selected_item_type }}{% endif %}{% if from_date %}&from_date={{ from_date|date:'Y-m-d' }}{% endif %}{% if to_date %}&to_date={{ to_date|date:'Y-m-d' }}{% endif %}" class="btn btn-outline" style="min-height:36px; padding:4px 12px;">← Previous</a>
+    {% endif %}
+
+    <span style="display:inline-flex; align-items:center; font-size:13px; padding:0 var(--space-2);" class="muted">
+      Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    </span>
+
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if selected_reason %}&reason={{ selected_reason }}{% endif %}{% if selected_item_type %}&item_type={{ selected_item_type }}{% endif %}{% if from_date %}&from_date={{ from_date|date:'Y-m-d' }}{% endif %}{% if to_date %}&to_date={{ to_date|date:'Y-m-d' }}{% endif %}" class="btn btn-outline" style="min-height:36px; padding:4px 12px;">Next →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function toggleItemType() {
+  const isProduct = document.getElementById('radioTypeProduct').checked;
+  const prodGroup = document.getElementById('product-group');
+  const stockGroup = document.getElementById('stock-group');
+  const prodSelect = prodGroup.querySelector('select');
+  const stockSelect = stockGroup.querySelector('select');
+
+  if (isProduct) {
+    prodGroup.style.display = 'block';
+    stockGroup.style.display = 'none';
+    if (stockSelect) stockSelect.value = '';
+  } else {
+    prodGroup.style.display = 'none';
+    stockGroup.style.display = 'block';
+    if (prodSelect) prodSelect.value = '';
+  }
+}
+document.addEventListener('DOMContentLoaded', toggleItemType);
+</script>
+{% endblock %}
+

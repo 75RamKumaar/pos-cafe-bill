@@ -6,9 +6,17 @@
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
   <div class="card stat"><span class="stat-label">Today's Sales</span><h2 class="stat-value">₹{{ total_sales|floatformat:2 }}</h2><span class="muted">{{ total_quantity|floatformat:2 }} items sold</span></div>
   <div class="card stat"><span class="stat-label">Today's Profit</span><h2 class="stat-value positive">₹{{ total_profit|floatformat:2 }}</h2><span class="muted">Before expenses</span></div>
+  <div class="card stat"><span class="stat-label">Expenses Today</span><h2 class="stat-value">₹{{ expenses_today|floatformat:2 }}</h2><span class="muted">Total expenses</span></div>
+  <div class="card stat"><span class="stat-label">Net Profit</span><h2 class="stat-value {% if net_profit >= 0 %}positive{% else %}negative{% endif %}">₹{{ net_profit|floatformat:2 }}</h2><span class="muted">After expenses</span></div>
   <div class="card stat"><span class="stat-label">Products Sold</span><h2 class="stat-value">{{ products_sold|length }}</h2><span class="muted">Distinct products today</span></div>
-  <div class="card stat"><span class="stat-label">Low Stock</span><h2 class="stat-value">{{ low_stock_count }}</h2><span class="muted">Active items with 5 units or fewer</span></div>
+  <div class="card stat"><span class="stat-label">Low Stock</span><h2 class="stat-value">{{ low_stock_count }}</h2><span class="muted">Active items with {{ low_stock_threshold|default:5 }} units or fewer</span></div>
   <div class="card stat"><span class="stat-label">Khata Outstanding</span><h2 class="stat-value">₹{{ total_outstanding|floatformat:2 }}</h2><span class="muted">Total customer balance</span></div>
+</div>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-top:16px">
+  <div class="card stat"><span class="stat-label">Cash</span><h2 class="stat-value">₹{{ cash_sales|floatformat:2 }}</h2><span class="muted">Cash received</span></div>
+  <div class="card stat"><span class="stat-label">UPI</span><h2 class="stat-value">₹{{ upi_sales|floatformat:2 }}</h2><span class="muted">UPI received</span></div>
+  <div class="card stat"><span class="stat-label">Card</span><h2 class="stat-value">₹{{ card_sales|floatformat:2 }}</h2><span class="muted">Card received</span></div>
+  <div class="card stat"><span class="stat-label">Khata</span><h2 class="stat-value">₹{{ khata_sales|floatformat:2 }}</h2><span class="muted">Credit sales</span></div>
 </div>
 <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:16px;align-items:start">
   <div class="card"><div class="row" style="padding-top:0"><div><h2 style="margin-bottom:4px">Top 5 Items Today</h2><span class="muted">Ranked by sales amount</span></div></div>
@@ -22,5 +30,11 @@
     </tbody></table></div>
   </div>
 </div>
-<div class="card" style="margin-top:16px"><div class="row" style="padding-top:0"><div><h2 style="margin-bottom:4px">All Products Sold Today</h2><span class="muted">Grouped from today's saved bill items</span></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Product</th><th>Quantity Sold</th><th>Selling Amount</th><th>Profit</th></tr></thead><tbody>{% for product in products_sold %}<tr><td><b>{{ product.item_name }}</b>{% if product.menu_item__category %}<br><small class="muted">{{ product.menu_item__category }}</small>{% endif %}</td><td>{{ product.quantity_sold|floatformat:2 }}</td><td>₹{{ product.selling_amount|floatformat:2 }}</td><td class="positive">₹{{ product.profit|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:30px">No products sold today.</td></tr>{% endfor %}</tbody></table></div></div>
+<details class="card" style="margin-top:16px">
+  <summary style="cursor:pointer;font-weight:600;padding:4px 0">
+    <span style="font-size:1.1rem">All Products Sold Today ({{ products_sold|length }})</span>
+    <span class="muted" style="font-weight:normal;margin-left:8px">— Click to expand</span>
+  </summary>
+  <div class="table-wrap" style="margin-top:12px"><table class="data-table"><thead><tr><th>Product</th><th>Quantity Sold</th><th>Selling Amount</th><th>Profit</th></tr></thead><tbody>{% for product in products_sold %}<tr><td><b>{{ product.item_name }}</b>{% if product.menu_item__category %}<br><small class="muted">{{ product.menu_item__category }}</small>{% endif %}</td><td>{{ product.quantity_sold|floatformat:2 }}</td><td>₹{{ product.selling_amount|floatformat:2 }}</td><td class="positive">₹{{ product.profit|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:30px">No products sold today.</td></tr>{% endfor %}</tbody></table></div>
+</details>
 {% endblock %}

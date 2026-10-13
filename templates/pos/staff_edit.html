@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Edit Staff: {{ staff_user.username }} | Cafe POS{% endblock %}
+{% block eyebrow %}Workspace / Staff / Edit{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Edit Staff Member</h1>
+    <p>Update credentials, role, or active status for <b>{{ staff_user.username }}</b>.</p>
+  </div>
+</div>
+
+<div class="card" style="max-width:640px;">
+  {% if form.non_field_errors %}
+    <div class="alert alert-error" style="margin-bottom:16px;">
+      {% for error in form.non_field_errors %}{{ error }}<br>{% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="field">
+      <label class="field-label">Username</label>
+      <input type="text" value="{{ staff_user.username }}" disabled style="opacity:0.75;cursor:not-allowed;">
+      <small class="muted">Username cannot be changed.</small>
+    </div>
+
+    {% for field in form %}
+      <div class="field">
+        <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<small class="muted" style="display:block;margin-top:4px;">{{ field.help_text }}</small>{% endif %}
+        {% for error in field.errors %}<small class="negative" style="display:block;margin-top:2px;">{{ error }}</small>{% endfor %}
+      </div>
+    {% endfor %}
+
+    <div style="display:flex;gap:12px;margin-top:20px;align-items:center;">
+      <button class="btn btn-primary" type="submit">Save Changes</button>
+      <a href="{% url 'staff_list' %}" class="btn btn-soft">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+

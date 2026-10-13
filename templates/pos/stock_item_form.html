@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title|default:"Stock Item" }} | Cafe POS{% endblock %}
+{% block eyebrow %}Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ page_title|default:"Stock Item" }}</h1>
+    <p>Manage raw material item details, measurement unit, current stock, and reorder alerts.</p>
+  </div>
+  <div class="actions">
+    <a href="{% url 'stock_items' %}" class="btn btn-outline">Back to Stock</a>
+  </div>
+</div>
+
+<div class="card" style="max-width: 640px;">
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="field">
+      <label class="field-label" for="{{ form.name.id_for_label }}">Item Name *</label>
+      {{ form.name }}
+      {% if form.name.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.name.errors|striptags }}</div>{% endif %}
+      <div class="helptext">e.g. Full Cream Milk, CTC Tea Powder, Brown Sugar, LPG Gas Cylinder</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.unit.id_for_label }}">Measurement Unit *</label>
+      {{ form.unit }}
+      {% if form.unit.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.unit.errors|striptags }}</div>{% endif %}
+      <div class="helptext">e.g. L (Liters), kg (Kilograms), pcs (Pieces), cylinder (Cylinder)</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4);">
+      <div class="field">
+        <label class="field-label" for="{{ form.current_qty.id_for_label }}">Current Quantity</label>
+        {{ form.current_qty }}
+        {% if form.current_qty.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.current_qty.errors|striptags }}</div>{% endif %}
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="{{ form.reorder_level.id_for_label }}">Reorder Alert Level</label>
+        {{ form.reorder_level }}
+        {% if form.reorder_level.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.reorder_level.errors|striptags }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.cost_per_unit.id_for_label }}">Cost Per Unit (₹)</label>
+      {{ form.cost_per_unit }}
+      {% if form.cost_per_unit.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.cost_per_unit.errors|striptags }}</div>{% endif %}
+      <div class="helptext">Latest purchase unit cost. Automatically updated when new purchases are recorded.</div>
+    </div>
+
+    <div style="display:flex; gap:var(--space-3); margin-top:var(--space-6);">
+      <button type="submit" class="btn btn-primary" style="flex:1;">{{ submit_label|default:"Save Stock Item" }}</button>
+      <a href="{% url 'stock_items' %}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+

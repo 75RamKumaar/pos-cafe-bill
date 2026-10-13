@@ -6,13 +6,85 @@
     <div class="brand-mark">☕</div>
     <h1>Welcome back</h1>
     <p class="muted">Sign in to continue to the cafe workspace.</p>
-    {% if form.errors %}<div class="alert alert-error">Your username and password did not match.</div>{% endif %}
-    <form method="post">
+    {% if form.errors %}
+      <div class="alert alert-error">
+        {% if active_tab == 'pin' %}Your username and PIN did not match.{% else %}Your username and password did not match.{% endif %}
+      </div>
+    {% endif %}
+
+    <div class="login-tabs" style="display:flex;margin:16px 0;border-bottom:1px solid var(--border-color,#e5e7eb);gap:8px;">
+        <button type="button" id="tabPasswordBtn" class="tab-btn" onclick="switchLoginTab('password')" style="padding:10px 16px;border:none;background:none;font-weight:600;cursor:pointer;border-bottom:2px solid {% if active_tab != 'pin' %}var(--primary,#4f46e5){% else %}transparent{% endif %};color:{% if active_tab != 'pin' %}var(--text,#111827){% else %}var(--muted,#6b7280){% endif %};">
+            Password
+        </button>
+        <button type="button" id="tabPinBtn" class="tab-btn" onclick="switchLoginTab('pin')" style="padding:10px 16px;border:none;background:none;font-weight:600;cursor:pointer;border-bottom:2px solid {% if active_tab == 'pin' %}var(--primary,#4f46e5){% else %}transparent{% endif %};color:{% if active_tab == 'pin' %}var(--text,#111827){% else %}var(--muted,#6b7280){% endif %};">
+            Quick PIN
+        </button>
+    </div>
+
+    <!-- Password Form -->
+    <form id="passwordForm" method="post" style="display:{% if active_tab == 'pin' %}none{% else %}block{% endif %};">
         {% csrf_token %}
+        <input type="hidden" name="auth_mode" value="password">
         <input type="hidden" name="next" value="{{ next }}">
-        <div class="field"><label class="field-label" for="id_username">Username</label>{{ form.username }}</div>
-        <div class="field"><label class="field-label" for="id_password">Password</label>{{ form.password }}</div>
+        <div class="field">
+            <label class="field-label" for="id_username">Username</label>
+            <input type="text" name="username" id="id_username" required autofocus value="{{ request.POST.username|default:'' }}">
+        </div>
+        <div class="field">
+            <label class="field-label" for="id_password">Password</label>
+            <input type="password" name="password" id="id_password" required>
+        </div>
         <button class="btn-primary" type="submit">Log in</button>
     </form>
+
+    <!-- Quick PIN Form -->
+    <form id="pinForm" method="post" style="display:{% if active_tab == 'pin' %}block{% else %}none{% endif %};">
+        {% csrf_token %}
+        <input type="hidden" name="auth_mode" value="pin">
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="field">
+            <label class="field-label" for="id_pin_username">Username</label>
+            <input type="text" name="username" id="id_pin_username" required value="{{ request.POST.username|default:'' }}">
+        </div>
+        <div class="field">
+            <label class="field-label" for="id_pin">4-Digit PIN</label>
+            <input type="password" name="pin" id="id_pin" maxlength="4" pattern="\d{4}" inputmode="numeric" placeholder="••••" required autocomplete="off">
+        </div>
+        <button class="btn-primary" type="submit">Log in with PIN</button>
+    </form>
 </div>
+
+<script>
+function switchLoginTab(mode) {
+    const pwForm = document.getElementById('passwordForm');
+    const pinForm = document.getElementById('pinForm');
+    const pwBtn = document.getElementById('tabPasswordBtn');
+    const pinBtn = document.getElementById('tabPinBtn');
+    if (mode === 'pin') {
+        pwForm.style.display = 'none';
+        pinForm.style.display = 'block';
+        pinBtn.style.borderBottomColor = 'var(--primary,#4f46e5)';
+        pinBtn.style.color = 'var(--text,#111827)';
+        pwBtn.style.borderBottomColor = 'transparent';
+        pwBtn.style.color = 'var(--muted,#6b7280)';
+        const u = document.getElementById('id_pin_username');
+        if (!u.value) {
+            u.value = document.getElementById('id_username').value;
+        }
+        document.getElementById('id_pin').focus();
+    } else {
+        pwForm.style.display = 'block';
+        pinForm.style.display = 'none';
+        pwBtn.style.borderBottomColor = 'var(--primary,#4f46e5)';
+        pwBtn.style.color = 'var(--text,#111827)';
+        pinBtn.style.borderBottomColor = 'transparent';
+        pinBtn.style.color = 'var(--muted,#6b7280)';
+        const u = document.getElementById('id_username');
+        if (!u.value) {
+            u.value = document.getElementById('id_pin_username').value;
+        }
+        document.getElementById('id_password').focus();
+    }
+}
+</script>
 {% endblock %}

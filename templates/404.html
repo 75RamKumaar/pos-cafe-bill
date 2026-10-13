@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found | Cafe POS{% endblock %}
+{% block eyebrow %}Error / 404{% endblock %}
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 40px auto; text-align: center; padding: 40px 24px;">
+    <div style="font-size: 54px; margin-bottom: 12px; line-height: 1;">🔍</div>
+    <h1 style="font-size: 26px; font-weight: 900; margin: 0 0 10px;">Page Not Found (404)</h1>
+    <p class="muted" style="font-size: 15px; margin: 0 0 24px;">
+        The requested page or endpoint does not exist.
+    </p>
+    <div style="display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;">
+        {% if is_owner %}
+            <a class="btn btn-primary" href="{% url 'dashboard' %}">Go to Dashboard</a>
+        {% elif is_cashier %}
+            <a class="btn btn-primary" href="{% url 'billing' %}">Go to Billing Counter</a>
+        {% else %}
+            <a class="btn btn-primary" href="/">Go to Home</a>
+        {% endif %}
+        <button type="button" class="btn btn-outline" onclick="window.history.back()">Go back</button>
+    </div>
+</div>
+{% endblock %}
+

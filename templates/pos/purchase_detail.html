@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Purchase #{{ purchase.id }} | Cafe POS{% endblock %}
+{% block eyebrow %}Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Purchase #{{ purchase.id }}</h1>
+    <p>Recorded on {{ purchase.date|date:"d M Y" }} &bull; Supplier: <a href="{% url 'supplier_detail' purchase.supplier.id %}" style="font-weight:700; color:var(--brand-strong);">{{ purchase.supplier.name }}</a></p>
+  </div>
+  <div class="actions">
+    <a href="{% url 'purchases' %}" class="btn btn-outline">Back to Purchases</a>
+    <a href="{% url 'purchase_create' %}" class="btn btn-primary">+ New Purchase</a>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns:minmax(0, 2fr) minmax(280px, 1fr); gap:var(--space-5); align-items:start;">
+  <div class="card">
+    <h3 style="margin-top:0;">Items Received</h3>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Unit</th>
+            <th>Quantity</th>
+            <th>Unit Cost</th>
+            <th style="text-align:right;">Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+          <tr>
+            <td><b>{{ line.stock_item.name }}</b></td>
+            <td><span class="pill pill-muted">{{ line.stock_item.unit }}</span></td>
+            <td><b style="font-size:15px;">{{ line.qty|floatformat:2 }}</b></td>
+            <td>₹{{ line.unit_cost|floatformat:2 }}</td>
+            <td style="text-align:right;"><b>₹{{ line.line_total|floatformat:2 }}</b></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if purchase.note %}
+    <div style="margin-top:var(--space-4); padding:var(--space-3); background:var(--surface-muted); border-radius:var(--radius-sm); border:1px solid var(--line);">
+      <div class="field-label" style="margin-bottom:2px;">Notes / Invoice Memo:</div>
+      <div>{{ purchase.note|linebreaksbr }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Payment Summary</h3>
+
+    <div class="summary-line">
+      <span class="muted">Total Cost:</span>
+      <b style="font-size:16px;">₹{{ purchase.total_amount|floatformat:2 }}</b>
+    </div>
+    <div class="summary-line">
+      <span class="muted">Amount Paid:</span>
+      <b style="color:var(--success);">₹{{ purchase.paid_amount|floatformat:2 }}</b>
+    </div>
+    <div class="summary-line" style="font-size:18px; font-weight:900; border-top:1px solid var(--line); margin-top:8px; padding-top:8px;">
+      <span>Due Amount:</span>
+      <b style="color:{% if purchase.due_amount > 0 %}var(--danger){% else %}var(--ink){% endif %};">
+        ₹{{ purchase.due_amount|floatformat:2 }}
+      </b>
+    </div>
+
+    <div style="margin-top:var(--space-4); border-top:1px solid var(--line); padding-top:var(--space-3);">
+      <div class="summary-line">
+        <span class="muted">Payment Method:</span>
+        <span class="pill pill-muted">{{ purchase.get_method_display }}</span>
+      </div>
+
+      {% if purchase.expense %}
+      <div class="summary-line" style="margin-top:6px;">
+        <span class="muted">Drawer Expense:</span>
+        <span class="pill pill-success" title="Cash drawer expense #{{ purchase.expense.id }}">Expense #{{ purchase.expense.id }}</span>
+      </div>
+      {% endif %}
+
+      <div class="summary-line" style="margin-top:6px;">
+        <span class="muted">Recorded At:</span>
+        <span class="muted">{{ purchase.created_at|date:"d M Y, h:i A" }}</span>
+      </div>
+    </div>
+
+    <div style="margin-top:var(--space-5); border-top:1px solid var(--line); padding-top:var(--space-4);">
+      <h4 style="margin:0 0 var(--space-2);">Supplier Status</h4>
+      <div class="summary-line">
+        <span class="muted">Supplier:</span>
+        <b>{{ purchase.supplier.name }}</b>
+      </div>
+      <div class="summary-line">
+        <span class="muted">Supplier Outstanding:</span>
+        <b style="color:{% if purchase.supplier.outstanding_dues > 0 %}var(--danger){% else %}var(--success){% endif %};">
+          ₹{{ purchase.supplier.outstanding_dues|floatformat:2 }}
+        </b>
+      </div>
+      <div style="margin-top:var(--space-3);">
+        <a href="{% url 'supplier_detail' purchase.supplier.id %}" class="btn btn-outline" style="width:100%; font-size:13px;">View Supplier Profile</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

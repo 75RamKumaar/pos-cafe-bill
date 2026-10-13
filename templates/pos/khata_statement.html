@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Account Statement - {{ customer.name }} | Cafe POS{% endblock %}
+{% block eyebrow %}Khata / Statement{% endblock %}
+{% block content %}
+<style>
+.statement-card { background: var(--bg-card, #fff); border-radius: 12px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 24px; }
+.statement-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; margin-bottom: 24px; }
+.shop-brand h2 { margin: 0; font-size: 24px; font-weight: 900; }
+.shop-brand p { margin: 4px 0 0; color: #64748b; font-size: 13px; }
+.statement-meta { text-align: right; }
+.statement-meta h1 { margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; }
+.statement-meta p { margin: 4px 0 0; font-size: 13px; color: #64748b; }
+
+.customer-section { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+.customer-info h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
+.customer-info p { margin: 2px 0; font-size: 14px; }
+
+.ageing-summary-card { margin-bottom: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+.ageing-summary-card h4 { margin: 0 0 12px; font-size: 13px; font-weight: 800; text-transform: uppercase; color: #475569; }
+.ageing-boxes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.ageing-box { text-align: center; padding: 10px 8px; border-radius: 6px; background: #fff; border: 1px solid #cbd5e1; }
+.ageing-box span { display: block; font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
+.ageing-box b { font-size: 16px; font-weight: 900; }
+.ageing-box.total { background: #eff6ff; border-color: #93c5fd; }
+.ageing-box.total b { color: #1d4ed8; }
+
+.ledger-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+.ledger-table th { background: #f1f5f9; padding: 10px 12px; text-align: left; font-weight: 800; border-bottom: 2px solid #cbd5e1; }
+.ledger-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+.ledger-table tr:last-child td { border-bottom: 2px solid #cbd5e1; }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+
+@media print {
+    body { background: #fff !important; }
+    .sidebar, .topbar, .site-header, .page-head, .btn-print-group { display: none !important; }
+    .content-area, .main-layout { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    .statement-card { box-shadow: none !important; padding: 0 !important; border: none !important; }
+}
+</style>
+
+<div class="page-head btn-print-group" style="margin-bottom:16px;">
+    <div>
+        <a href="{% url 'khata' %}" class="btn btn-outline">&larr; Back to Khata</a>
+    </div>
+    <div style="display:flex;gap:8px;">
+        <button type="button" class="btn btn-primary" onclick="window.print()">🖨️ Print Statement</button>
+    </div>
+</div>
+
+<div class="statement-card">
+    <div class="statement-header">
+        <div class="shop-brand">
+            <h2>{{ business_settings.name|default:"Cafe POS" }}</h2>
+            {% if business_settings.address %}<p>{{ business_settings.address }}</p>{% endif %}
+            {% if business_settings.phone %}<p>Phone: {{ business_settings.phone }}</p>{% endif %}
+            {% if business_settings.gstin %}<p>GSTIN: {{ business_settings.gstin }}</p>{% endif %}
+        </div>
+        <div class="statement-meta">
+            <h1>Account Statement</h1>
+            <p>Date: <b>{{ today|date:"d M Y" }}</b></p>
+            <p>Account: <b>#CUST-{{ customer.id }}</b></p>
+        </div>
+    </div>
+
+    <div class="customer-section">
+        <div class="customer-info">
+            <h4>Billed To</h4>
+            <p><b>{{ customer.name }}</b></p>
+            {% if customer.phone %}<p>Phone: {{ customer.phone }}</p>{% endif %}
+            {% if customer.email %}<p>Email: {{ customer.email }}</p>{% endif %}
+            {% if customer.address %}<p>{{ customer.address }}</p>{% endif %}
+        </div>
+        <div class="customer-info text-right">
+            <h4>Account Summary</h4>
+            <p>Credit Limit: <b>{% if customer.credit_limit is not None %}₹{{ customer.credit_limit|floatformat:2 }}{% else %}No Limit{% endif %}</b></p>
+            <p style="font-size:18px;margin-top:8px;">
+                Outstanding Balance: 
+                <b style="color:{% if final_balance > 0 %}#dc2626{% else %}#16a34a{% endif %};">
+                    ₹{{ final_balance|floatformat:2 }}
+                </b>
+            </p>
+        </div>
+    </div>
+
+    <div class="ageing-summary-card">
+        <h4>FIFO Ageing Summary</h4>
+        <div class="ageing-boxes">
+            <div class="ageing-box">
+                <span>0-30 Days</span>
+                <b style="color:#15803d;">₹{{ ageing.b_0_30|floatformat:2 }}</b>
+            </div>
+            <div class="ageing-box">
+                <span>31-60 Days</span>
+                <b style="color:#854d0e;">₹{{ ageing.b_31_60|floatformat:2 }}</b>
+            </div>
+            <div class="ageing-box">
+                <span>61-90 Days</span>
+                <b style="color:#c2410c;">₹{{ ageing.b_61_90|floatformat:2 }}</b>
+            </div>
+            <div class="ageing-box">
+                <span>90+ Days</span>
+                <b style="color:#b91c1c;">₹{{ ageing.b_90_plus|floatformat:2 }}</b>
+            </div>
+            <div class="ageing-box total">
+                <span>Total Balance</span>
+                <b>₹{{ ageing.total|floatformat:2 }}</b>
+            </div>
+        </div>
+    </div>
+
+    <h3 style="margin:24px 0 8px;font-size:16px;font-weight:900;">Transaction Ledger</h3>
+    <table class="ledger-table">
+        <thead>
+            <tr>
+                <th style="width:110px;">Date</th>
+                <th>Type</th>
+                <th>Method</th>
+                <th>Note / Details</th>
+                <th class="text-right" style="width:110px;">Debit (+)</th>
+                <th class="text-right" style="width:110px;">Credit (-)</th>
+                <th class="text-right" style="width:120px;">Balance</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in ledger %}
+            <tr>
+                <td class="muted">
+                    {% if row.date %}{{ row.date|date:"d M Y" }}{% else %}Opening{% endif %}
+                </td>
+                <td><b>{{ row.type }}</b></td>
+                <td>{{ row.method|default:"-" }}</td>
+                <td>{{ row.note|default:"-" }}</td>
+                <td class="text-right">
+                    {% if row.debit > 0 %}₹{{ row.debit|floatformat:2 }}{% else %}-{% endif %}
+                </td>
+                <td class="text-right">
+                    {% if row.credit > 0 %}₹{{ row.credit|floatformat:2 }}{% else %}-{% endif %}
+                </td>
+                <td class="text-right">
+                    <b>₹{{ row.running_balance|floatformat:2 }}</b>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center muted" style="padding:24px;">No transactions recorded.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="background:#f8fafc;font-weight:900;font-size:14px;">
+                <td colspan="6" class="text-right" style="padding:12px;">Closing Balance Due:</td>
+                <td class="text-right" style="padding:12px;color:{% if final_balance > 0 %}#dc2626{% else %}#16a34a{% endif %};">
+                    ₹{{ final_balance|floatformat:2 }}
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div style="margin-top:36px;padding-top:16px;border-top:1px dashed #cbd5e1;display:flex;justify-content:space-between;color:#64748b;font-size:12px;">
+        <div>Generated by {{ business_settings.name|default:"Cafe POS" }}</div>
+        <div>Thank you for your business!</div>
+    </div>
+</div>
+{% endblock %}
+

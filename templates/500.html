@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Server Error (500) | Cafe POS</title>
+<style>
+:root {
+    --brand: #e85d3f;
+    --ink: #20252b;
+    --muted: #74808a;
+    --surface: #ffffff;
+    --canvas: #f3f5f6;
+    --line: #e3e8eb;
+    --radius-lg: 18px;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    padding: 24px;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+.error-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 12px 32px rgba(32, 37, 43, 0.08);
+    max-width: 520px;
+    width: 100%;
+    padding: 44px 28px;
+    text-align: center;
+}
+.icon { font-size: 54px; margin-bottom: 14px; line-height: 1; }
+h1 { font-size: 26px; font-weight: 900; margin: 0 0 10px; color: var(--ink); }
+p { font-size: 15px; color: var(--muted); line-height: 1.5; margin: 0 0 24px; }
+.actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 22px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 14px;
+    text-decoration: none;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-outline { background: #fff; color: var(--ink); border-color: var(--line); }
+</style>
+</head>
+<body>
+<div class="error-card">
+    <div class="icon">⚠️</div>
+    <h1>Server Error (500)</h1>
+    <p>Something went wrong on our end while processing your request. Please try reloading the page, or contact an administrator if the issue persists.</p>
+    <div class="actions">
+        <a href="/" class="btn btn-primary">Return to Home</a>
+        <button type="button" class="btn btn-outline" onclick="window.location.reload()">Reload</button>
+    </div>
+</div>
+</body>
+</html>
+

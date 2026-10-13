@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Staff Management | Cafe POS{% endblock %}
+{% block eyebrow %}Workspace / Staff{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Staff Management</h1>
+    <p>Manage cafe staff members, roles, passwords, and 4-digit Quick PINs.</p>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:2fr 1fr;gap:20px;align-items:start;">
+  <!-- Staff List -->
+  <div class="card">
+    <div class="row" style="padding-top:0;">
+      <div>
+        <h2 style="margin-bottom:4px;">Staff Members</h2>
+        <span class="muted">All registered accounts in this workspace</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Quick PIN</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for member in staff_members %}
+          <tr>
+            <td>
+              <b>{{ member.user.username }}</b>
+              {% if member.is_self %}<span class="pill pill-soft" style="font-size:9px;margin-left:4px;">You</span>{% endif %}
+            </td>
+            <td>{{ member.user.get_full_name|default:"—" }}</td>
+            <td>
+              {% if member.role == 'Owner' %}
+                <span class="pill pill-success">{{ member.role }}</span>
+              {% elif member.role == 'Cashier' %}
+                <span class="pill pill-muted">{{ member.role }}</span>
+              {% else %}
+                <span class="pill pill-danger">{{ member.role }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if member.has_pin %}
+                <span class="pill pill-soft" style="font-weight:600;">PIN Set</span>
+              {% else %}
+                <span class="muted" style="font-size:12px;">No PIN</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if member.user.is_active %}
+                <span class="pill pill-success">Active</span>
+              {% else %}
+                <span class="pill pill-danger">Disabled</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'staff_edit' member.user.id %}" class="btn btn-soft" style="padding:4px 10px;font-size:12px;">Edit</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="muted" style="text-align:center;padding:24px;">No staff members found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add Staff Card -->
+  <div class="card">
+    <h3 style="margin-bottom:14px;">Add New Staff Member</h3>
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        <div class="field">
+          <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<small class="muted" style="display:block;margin-top:4px;">{{ field.help_text }}</small>{% endif %}
+          {% for error in field.errors %}<small class="negative" style="display:block;margin-top:2px;">{{ error }}</small>{% endfor %}
+        </div>
+      {% endfor %}
+      <button class="btn btn-primary" type="submit" style="width:100%;margin-top:12px;">Create Staff</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}{{ supplier.name }} | Supplier Ledger | Cafe POS{% endblock %}
+{% block eyebrow %}Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ supplier.name }}</h1>
+    <p>
+      {% if supplier.phone %}📞 {{ supplier.phone }} &bull; {% endif %}
+      Supplier profile and inward purchase ledger.
+    </p>
+  </div>
+  <div class="actions">
+    <a href="{% url 'purchase_create' %}?supplier={{ supplier.id }}" class="btn btn-primary">+ New Purchase</a>
+    <a href="{% url 'supplier_edit' supplier.id %}" class="btn btn-outline">Edit Supplier</a>
+    <a href="{% url 'suppliers' %}" class="btn btn-outline">Back to Suppliers</a>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: var(--space-5);">
+  <div class="card stat">
+    <div class="stat-label">Total Purchases</div>
+    <div class="stat-value">₹{{ supplier.total_purchases|floatformat:2 }}</div>
+    <div class="stat-note">Lifetime purchases</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Total Paid</div>
+    <div class="stat-value" style="color:var(--success);">₹{{ supplier.total_paid|floatformat:2 }}</div>
+    <div class="stat-note">Settled amount</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Outstanding Balance</div>
+    <div class="stat-value" style="color:{% if supplier.outstanding_dues > 0 %}var(--danger){% else %}var(--ink){% endif %};">
+      ₹{{ supplier.outstanding_dues|floatformat:2 }}
+    </div>
+    <div class="stat-note">Current outstanding due</div>
+  </div>
+</div>
+
+{% if supplier.notes %}
+<div class="card" style="margin-bottom: var(--space-5);">
+  <h3 style="margin-top:0; font-size:15px; margin-bottom:var(--space-2);">Supplier Notes & Terms</h3>
+  <div style="color:var(--muted); font-size:14px; white-space:pre-wrap;">{{ supplier.notes }}</div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-4);">
+    <h2 style="font-size:18px; margin:0;">Purchase Ledger</h2>
+    <span class="pill pill-muted">{{ purchases|length }} records</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Purchase #</th>
+          <th>Date</th>
+          <th>Items Purchased</th>
+          <th>Total Cost</th>
+          <th>Paid</th>
+          <th>Due</th>
+          <th>Method</th>
+          <th>Status</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in purchases %}
+        <tr>
+          <td>
+            <a href="{% url 'purchase_detail' p.id %}" style="font-weight:700; color:var(--primary); text-decoration:none;">
+              #{{ p.id }}
+            </a>
+          </td>
+          <td>{{ p.date|date:"d M Y" }}</td>
+          <td>
+            <div style="font-size:13px;">
+              {% for line in p.lines.all %}
+                <div><b>{{ line.qty|floatformat:2 }} {{ line.stock_item.unit }}</b> {{ line.stock_item.name }} <span class="helptext">(@ ₹{{ line.unit_cost|floatformat:2 }})</span></div>
+              {% empty %}
+                <span class="pill pill-muted">No items</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td><b>₹{{ p.total_amount|floatformat:2 }}</b></td>
+          <td style="color:var(--success);">₹{{ p.paid_amount|floatformat:2 }}</td>
+          <td>
+            <b style="color:{% if p.due_amount > 0 %}var(--danger){% else %}var(--ink){% endif %};">
+              ₹{{ p.due_amount|floatformat:2 }}
+            </b>
+          </td>
+          <td><span class="pill pill-muted">{{ p.method }}</span></td>
+          <td>
+            {% if p.due_amount > 0 %}
+              <span class="pill pill-danger" style="background:var(--danger-soft); color:var(--danger);">⚠️ Due</span>
+            {% else %}
+              <span class="pill pill-success">Settled</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <a href="{% url 'purchase_detail' p.id %}" class="btn btn-outline" style="min-height:32px; padding:4px 10px; font-size:12px;">View Memo</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" style="text-align:center; padding:var(--space-8); color:var(--muted);">
+            No purchases recorded for this supplier yet.
+            <div style="margin-top:var(--space-3);">
+              <a href="{% url 'purchase_create' %}?supplier={{ supplier.id }}" class="btn btn-primary" style="font-size:13px;">+ Record First Purchase</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+

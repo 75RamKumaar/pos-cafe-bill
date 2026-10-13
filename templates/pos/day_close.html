@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}{% if is_open %}Day Close - Shift #{{ shift.id }}{% else %}Shift #{{ shift.id }} Summary{% endif %} | Cafe POS{% endblock %}
+{% block eyebrow %}Shifts / {% if is_open %}Close shift{% else %}Shift summary{% endif %}{% endblock %}
+{% block content %}
+<style>
+.day-close-page {
+    max-width: 860px;
+    margin: 0 auto;
+}
+.cash-reconciliation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.recon-card {
+    background: var(--surface);
+    border: 2px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.recon-card.highlight {
+    background: #fbfdff;
+    border-color: var(--brand);
+}
+.recon-label {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-bottom: 6px;
+}
+.recon-value {
+    font-size: 24px;
+    font-weight: 900;
+    color: var(--ink);
+}
+.recon-value.brand {
+    color: var(--brand);
+    font-size: 28px;
+}
+.variance-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 900;
+}
+.variance-neutral {
+    background: var(--surface-muted);
+    color: var(--muted);
+    border: 1px solid var(--line);
+}
+.variance-positive {
+    background: var(--success-soft);
+    color: var(--success);
+    border: 1px solid var(--success);
+}
+.variance-negative {
+    background: var(--danger-soft);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+}
+@media print {
+    body { background: #fff !important; }
+    .no-print, .sidebar, .topbar, .mobile-bar, .messages { display: none !important; }
+    .day-close-page { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+    .card { border: 1px solid #333 !important; box-shadow: none !important; }
+    .recon-card { border: 1px solid #666 !important; }
+}
+</style>
+
+<div class="day-close-page">
+    <div class="page-head">
+        <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+                <h1 style="margin:0;">{% if is_open %}Close Shift #{{ shift.id }}{% else %}Shift #{{ shift.id }} Summary Report{% endif %}</h1>
+                {% if is_open %}
+                <span class="pill pill-success" style="font-size:12px;">ACTIVE SHIFT</span>
+                {% else %}
+                <span class="pill pill-muted" style="font-size:12px;">CLOSED</span>
+                {% endif %}
+            </div>
+            <p>
+                Opened by <b>{{ shift.opened_by.username|default:"Staff" }}</b> on {{ shift.opened_at|date:"d M Y, h:i A" }}
+                {% if not is_open %} · Closed by <b>{{ shift.closed_by.username|default:"Staff" }}</b> on {{ shift.closed_at|date:"d M Y, h:i A" }}{% endif %}
+            </p>
+        </div>
+        <div class="actions no-print">
+            <button type="button" class="btn btn-outline" onclick="window.print()">Print Report</button>
+            {% if not is_open and is_owner %}
+            <form method="post" action="{% url 'shift_reopen' shift.id %}" onsubmit="return confirm('Reopen this closed shift? This will be audit-logged.')" style="margin:0;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Reopen Shift</button>
+            </form>
+            {% endif %}
+            {% if not is_open %}
+            <a href="{% url 'shift_open' %}" class="btn btn-primary">Open New Shift</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Expected Cash Reconciliation Grid -->
+    <div class="cash-reconciliation-grid">
+        <div class="recon-card">
+            <span class="recon-label">Opening Cash</span>
+            <span class="recon-value">₹{{ opening_cash|floatformat:2 }}</span>
+            <small class="muted" style="font-size:11px;margin-top:4px;">Float in drawer</small>
+        </div>
+        <div class="recon-card">
+            <span class="recon-label">(+) Cash Sales</span>
+            <span class="recon-value" style="color:var(--success);">+ ₹{{ cash_sales|floatformat:2 }}</span>
+            <small class="muted" style="font-size:11px;margin-top:4px;">Cash & split-cash</small>
+        </div>
+        <div class="recon-card">
+            <span class="recon-label">(+) Khata Collections</span>
+            <span class="recon-value" style="color:var(--success);">+ ₹{{ cash_khata|floatformat:2 }}</span>
+            <small class="muted" style="font-size:11px;margin-top:4px;">Cash assumed</small>
+        </div>
+        <div class="recon-card">
+            <span class="recon-label">(-) Drawer Expenses</span>
+            <span class="recon-value" style="color:var(--danger);">- ₹{{ drawer_expenses|floatformat:2 }}</span>
+            <small class="muted" style="font-size:11px;margin-top:4px;">Paid from drawer</small>
+        </div>
+        <div class="recon-card highlight" style="grid-column: 1 / -1;">
+            <span class="recon-label">(=) Expected Cash in Drawer</span>
+            <span class="recon-value brand" id="expectedCashVal" data-amount="{{ expected_cash }}">₹{{ expected_cash|floatformat:2 }}</span>
+            <small class="muted" style="font-size:12px;margin-top:4px;">Calculated as: Opening (₹{{ opening_cash|floatformat:2 }}) + Cash Sales (₹{{ cash_sales|floatformat:2 }}) + Khata Collections (₹{{ cash_khata|floatformat:2 }}) - Drawer Expenses (₹{{ drawer_expenses|floatformat:2 }})</small>
+        </div>
+    </div>
+
+    {% if is_open %}
+    <!-- Form to close active shift -->
+    <div class="card" style="padding:28px;">
+        <h2 style="margin-top:0;font-size:20px;">Count Cash & Finalize Shift</h2>
+        <p class="muted" style="margin-bottom:20px;">Please count all currency notes and coins physically inside the register drawer.</p>
+
+        <form method="post" action="{% url 'day_close' %}" id="shiftCloseForm">
+            {% csrf_token %}
+            <div class="field" style="margin-bottom:20px;">
+                <label class="field-label" for="countedCashInput" style="font-size:14px;font-weight:800;margin-bottom:8px;">
+                    Counted Physical Cash (₹) <span style="color:var(--brand);">*</span>
+                </label>
+                <div style="position:relative;">
+                    <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-weight:900;font-size:18px;color:var(--muted);">₹</span>
+                    <input type="number" step="0.01" min="0" name="counted_cash" id="countedCashInput" required placeholder="0.00" style="padding-left:36px;font-size:22px;font-weight:900;height:54px;border-radius:12px;" oninput="updateLiveVariance()">
+                </div>
+            </div>
+
+            <!-- Live Variance Card -->
+            <div id="varianceContainer" style="margin-bottom:20px;padding:16px;background:var(--surface-muted);border:2px dashed var(--line-strong);border-radius:12px;">
+                <span class="recon-label" style="display:block;margin-bottom:8px;">Live Variance (Counted vs Expected)</span>
+                <div id="liveVarianceDisplay" class="variance-badge variance-neutral">
+                    Enter counted cash above
+                </div>
+            </div>
+
+            <div class="field" style="margin-bottom:24px;">
+                <label class="field-label" for="shiftNote" style="font-size:14px;font-weight:800;margin-bottom:8px;">
+                    Shift Notes / Handover Note
+                </label>
+                <textarea name="note" id="shiftNote" rows="3" placeholder="Enter notes or explanation for any cash variance..."></textarea>
+            </div>
+
+            <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:14px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+                <span style="font-size:24px;">🔒</span>
+                <span style="font-size:13px;color:#9a3412;line-height:1.4;">
+                    <b>Important:</b> Closing this shift is final. Further sales will require opening a new shift. Only an Owner can reopen a closed shift.
+                </span>
+            </div>
+
+            <div class="actions">
+                <button type="submit" class="btn btn-primary" style="flex:1;min-height:50px;font-size:16px;">
+                    Confirm & Close Shift
+                </button>
+                <a href="{% url 'billing' %}" class="btn btn-outline" style="min-height:50px;">Return to Billing</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+    function updateLiveVariance() {
+        const input = document.getElementById("countedCashInput");
+        const display = document.getElementById("liveVarianceDisplay");
+        const expectedEl = document.getElementById("expectedCashVal");
+        if (!input || !display || !expectedEl) return;
+
+        const countedVal = parseFloat(input.value);
+        const expectedVal = parseFloat(expectedEl.dataset.amount || 0);
+
+        if (isNaN(countedVal)) {
+            display.className = "variance-badge variance-neutral";
+            display.textContent = "Enter counted cash above";
+            return;
+        }
+
+        const diff = Math.round((countedVal - expectedVal) * 100) / 100;
+        if (Math.abs(diff) < 0.005) {
+            display.className = "variance-badge variance-positive";
+            display.innerHTML = "✓ Exact match (₹0.00)";
+        } else if (diff > 0) {
+            display.className = "variance-badge variance-positive";
+            display.innerHTML = `↑ Excess / Over: +₹${diff.toFixed(2)}`;
+        } else {
+            display.className = "variance-badge variance-negative";
+            display.innerHTML = `↓ Short / Deficit: -₹${Math.abs(diff).toFixed(2)}`;
+        }
+    }
+    </script>
+    {% else %}
+    <!-- Closed shift read-only review -->
+    <div class="card" style="padding:28px;">
+        <h2 style="margin-top:0;font-size:20px;border-bottom:2px solid var(--line);padding-bottom:12px;margin-bottom:18px;">Reconciliation Summary</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+            <div>
+                <span class="recon-label">Counted Physical Cash</span>
+                <div style="font-size:26px;font-weight:900;">₹{{ counted_cash|floatformat:2 }}</div>
+            </div>
+            <div>
+                <span class="recon-label">Cash Variance</span>
+                <div>
+                    {% if variance == 0 %}
+                    <span class="variance-badge variance-positive">Exact Match (₹0.00)</span>
+                    {% elif variance > 0 %}
+                    <span class="variance-badge variance-positive">+₹{{ variance|floatformat:2 }} (Excess / Over)</span>
+                    {% else %}
+                    <span class="variance-badge variance-negative">₹{{ variance|floatformat:2 }} (Short / Deficit)</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div>
+            <span class="recon-label">Shift Notes</span>
+            <p style="margin:4px 0 0;font-size:14px;color:var(--ink-soft);background:var(--surface-muted);padding:12px;border-radius:8px;">
+                {{ note|default:"No notes entered." }}
+            </p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

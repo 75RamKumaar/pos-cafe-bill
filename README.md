@@ -1,4 +1,4 @@
-﻿# Cafe POS — Django Offline POS + Khata
+# Cafe POS — Django Offline POS + Khata
 
 A local Django 5 application for a tea shop, cafe, or wholesale counter.
 Designed for single-shop, offline LAN deployments.
@@ -9,21 +9,23 @@ Designed for single-shop, offline LAN deployments.
 
 | Area | Detail |
 |------|--------|
-| **POS Counter** | Fast keyboard-driven billing with shortcut keys per product |
-| **Payment Modes** | Cash, UPI, Khata (credit) |
-| **Khata Ledger** | Customer credit tracking, partial payments, balance view |
-| **Stock Control** | Stock deducted per sale; overselling rejected with a clear error |
-| **Menu Management** | Add/edit products with image upload, price, cost price, stock |
+| **POS Counter** | Fast keyboard-driven and touch billing (56px targets, one-hand friendly) |
+| **Payment Modes** | Cash, UPI, Card, Khata (credit), and Split payments |
+| **Cash Handling** | Change due calculator, quick tender buttons, receipt printing |
+| **Favorites Strip** | Top 8 best-selling products from the last 30 days displayed above categories |
+| **Khata Ledger** | Customer dues ledger, partial payments, protected customer deletion |
+| **Stock Tracking** | Optional per-item stock tracking; untracked items never block sales |
+| **Bill Management** | Safe bill voiding with stock restoration, Khata reversal, and audit logging |
+| **Menu Management** | Add/edit products with image upload, price, cost price, stock tracking |
 | **Expense Tracking** | Log daily expenses with category and date |
-| **Dashboard** | Daily sales, profit, top products at a glance |
-| **Reports** | Revenue, payment-mode breakdown, Khata credit chart (Chart.js, offline) |
-| **Audit Log** | Timestamped log of every bill creation/deletion |
-| **Pagination** | All list views paginated (50/page) with query-param-preserving links |
-| **Roles** | Owner (full access) / Cashier (billing only) enforced at every view |
+| **Dashboard** | Real-time net sales (accounting for discounts), profit, top items, expense tracking |
+| **Reports & Export** | Sales reports, payment breakdown from `BillPayment`, CSV export |
+| **Audit Log** | Timestamped audit log tracking billing, voiding, and Khata actions |
+| **Roles & Auth** | Owner (full access) / Cashier (billing only; requires Owner authorization to void) |
+| **Security & Throttling** | Login lockout (locks username+IP for 5 minutes after 5 failures), secure cookies |
 | **Backups** | `python manage.py backup_db` — timestamped SQLite snapshots in `backups/` |
 | **Demo Data** | `python manage.py seed_demo` — products, customers, bills |
-| **Static Files** | WhiteNoise serves compressed static files; Chart.js vendored offline |
-| **Security** | CSRF, XSS-safe customer search, secure cookies, secret-key validation |
+| **Static Files** | Standalone high-contrast CSS/JS, vendored Chart.js offline, WhiteNoise serving |
 
 ---
 
@@ -35,9 +37,9 @@ git clone <repo-url>
 cd cafe_pos_django_v2
 
 # 2. Create and activate a virtual environment
-python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Linux / macOS
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux / macOS
 
 # 3. Install dependencies
 pip install -r requirements.txt
@@ -45,23 +47,27 @@ pip install -r requirements.txt
 # 4. Configure environment
 copy .env.example .env         # Windows
 # cp .env.example .env         # Linux / macOS
-# Open .env and set DJANGO_SECRET_KEY to a long random string (>= 32 chars)
+# Starts out-of-the-box in development mode (DJANGO_DEBUG=True).
+# In production, set DJANGO_DEBUG=False and generate a secret key:
+# python manage.py gen_secret
 
-# 5. Apply migrations and seed demo data
+# 5. Apply database migrations (do not run makemigrations; all migrations are tracked)
 python manage.py migrate
+
+# 6. Seed demo data (optional)
 python manage.py seed_demo
 
-# 6. Create the first superuser (Owner)
+# 7. Create users and assign roles (see User Roles section)
 python manage.py createsuperuser
 
-# 7. Collect static files
+# 8. Collect static files
 python manage.py collectstatic --noinput
 
-# 8. Run the server (LAN-accessible)
+# 9. Run the server
 python manage.py runserver 0.0.0.0:8000
 ```
 
-Open **http://127.0.0.1:8000/** in your browser.
+Open **http://127.0.0.1:8000/** in your browser and sign in.
 
 ---
 
@@ -69,56 +75,75 @@ Open **http://127.0.0.1:8000/** in your browser.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DJANGO_SECRET_KEY` | *(required)* | Random secret key — must be >= 32 chars and not start with `replace-with` |
-| `DJANGO_DEBUG` | `False` | Set `True` for development |
-| `DJANGO_ALLOWED_HOSTS` | `127.0.0.1,localhost` | Comma-separated list of allowed hostnames |
-| `DJANGO_HTTPS` | *(unset)* | Set `1` to enable `SECURE_SSL_REDIRECT`, secure cookies, and HSTS |
+| `DJANGO_SECRET_KEY` | *(included in example)* | Secret key. In production, generate with `python manage.py gen_secret` |
+| `DJANGO_DEBUG` | `True` *(in .env.example)* | Set `False` in production |
+| `DJANGO_ALLOWED_HOSTS` | `127.0.0.1,localhost` | Comma-separated list of allowed hostnames/IPs |
+| `DJANGO_HTTPS` | `False` | Set `1` or `True` to enable HTTPS redirect, secure cookies, and HSTS |
 
-> **Startup check:** The server raises `ImproperlyConfigured` at boot if `DEBUG=False`
-> and `DJANGO_SECRET_KEY` is shorter than 32 characters or starts with `"replace-with"`.
-
----
-
-## User Roles
-
-The application uses Django built-in groups:
-
-| Group | Access |
-|-------|--------|
-| **Owner** | All pages — dashboard, reports, menu, customers, expenses, audit log, Khata |
-| **Cashier** | Billing counter only |
-
-Superusers inherit Owner-level access.
-
-**Assigning roles:**
-1. Sign in at `/admin/` with your superuser account.
-2. Go to **Users -> (select user) -> Groups** and add `Owner` or `Cashier`.
-
-Groups are created automatically by the migrations.
+> **Startup check:** When `DJANGO_DEBUG=False`, Django will halt with `ImproperlyConfigured` if `DJANGO_SECRET_KEY` is under 32 characters or starts with `"replace-with"`.
 
 ---
 
-## Khata (Credit) Checkout
+## User Roles & Setup
 
-1. On the billing screen, select **Khata (credit)** as the payment mode.
-2. A customer **must** be selected — the submit button is blocked client-side otherwise.
-3. The bill creates a `KhataTransaction(kind=CREDIT)` for the grand total inside the same atomic transaction.
-4. **Deleting** a Khata bill automatically reverses the credit via cascade delete.
-5. Balances are visible on the **Khata** and **Customers** pages.
+Access control is strictly enforced at every view using Django groups:
+
+| Role / Group | Permissions |
+|--------------|-------------|
+| **Owner** | Full system access — dashboard, sales reports, CSV export, menu management, customer ledger, expense management, settings, audit log, and direct bill voiding. |
+| **Cashier** | Billing counter, product search, receipt reprint, customer search, and Khata payments. Bill voiding requires an Owner's credential authorization. |
+
+Superusers automatically inherit Owner-level privileges.
+
+### Creating Owner and Cashier Users
+
+**Option A — Via Django Admin:**
+1. Log in to `/admin/` using your superuser account.
+2. Navigate to **Authentication and Authorization -> Users -> Add user**.
+3. Under **Groups**, assign the user to `Owner` or `Cashier` (groups are created automatically during migration).
+
+**Option B — Via Management Shell:**
+```bash
+python manage.py shell
+```
+```python
+from django.contrib.auth.models import User, Group
+
+# Create Cashier
+cashier = User.objects.create_user(username="cashier1", password="password123")
+cashier.groups.add(Group.objects.get(name="Cashier"))
+
+# Create Owner
+owner = User.objects.create_user(username="owner1", password="password123")
+owner.groups.add(Group.objects.get(name="Owner"))
+```
 
 ---
 
-## Static Files & Offline Operation
+## Security & Login Throttling
 
-WhiteNoise is configured to serve and compress static files without a separate web server.
-Chart.js 4.4.7 is vendored at `pos/static/pos/chart.umd.js` — no CDN required.
+- **Login Throttling:** Brute-force protection locks any `username + IP` combination for 5 minutes after 5 consecutive failed login attempts using Django's cache framework (`LocMemCache`). Successful login clears the failure counter.
+- **Session & Cookies:** `SESSION_COOKIE_SAMESITE = "Lax"`, `SESSION_COOKIE_HTTPONLY = True`, `SESSION_COOKIE_AGE = 43200` (12 hours).
+- **Security Headers:** `SECURE_CONTENT_TYPE_NOSNIFF = True` and `X_FRAME_OPTIONS = "DENY"`.
+- **Secret Key Generation:** Run `python manage.py gen_secret` to generate a cryptographically strong secret key.
 
-For production / scale, put **Nginx** or **Caddy** in front and point `/media/` at the
-`media/` directory directly. The current setup uses Django development-only `serve()` for
-uploaded images (see comment in `cafe_pos/urls.py`).
+---
 
-After pulling changes always regenerate static files:
+## Media Files & Production Deployment
 
+- **Development (`DEBUG=True`):** Uploaded product images under `media/` are served automatically via Django's `serve()` view.
+- **Production (`DEBUG=False`):** Django does not serve media files in production for performance and security reasons. Point a reverse proxy (such as **Nginx** or **Caddy**) directly at the `media/` directory.
+
+### Nginx Example
+```nginx
+location /media/ {
+    alias /path/to/cafe_pos_django_v2/media/;
+    expires 30d;
+}
+```
+
+### Static Files
+Static files are compressed and cached via **WhiteNoise**. After making static file changes:
 ```bash
 python manage.py collectstatic --noinput
 ```
@@ -131,90 +156,32 @@ python manage.py collectstatic --noinput
 python manage.py backup_db
 ```
 
-Writes a timestamped copy to `backups/` and removes copies older than 30 days.
-The folder is excluded from Git.
-
-### Automate on Linux (cron)
-
-```
-0 2 * * * cd /path/to/cafe_pos_django_v2 && /path/to/venv/bin/python manage.py backup_db >> backup.log 2>&1
-```
+Creates a timestamped snapshot of `db.sqlite3` in the `backups/` directory and removes snapshots older than 30 days.
 
 ### Automate on Windows (Task Scheduler)
-
-- **Program:** `C:\path\to\cafe_pos_django_v2\venv\Scripts\python.exe`
+- **Program:** `C:\path\to\cafe_pos_django_v2\.venv\Scripts\python.exe`
 - **Arguments:** `manage.py backup_db`
 - **Start in:** `C:\path\to\cafe_pos_django_v2`
+
+### Automate on Linux (Cron)
+```
+0 2 * * * cd /path/to/cafe_pos_django_v2 && /path/to/.venv/bin/python manage.py backup_db >> backup.log 2>&1
+```
 
 ---
 
 ## Running Tests
 
+Run the full test suite with:
+
 ```bash
 python manage.py test pos
 ```
 
-The test suite covers:
-
-- Role-based access control (every URL as Owner, Cashier, and anonymous)
-- `bill_create` — malformed input (400), overselling (400), Khata without customer (400)
-- Khata flow — credit created on sale, balance zeroed on bill deletion
-- Menu form — inactive shortcut reuse allowed; duplicate active shortcut rejected case-insensitively; bad image extension rejected
-- XSS — customer name with `<script>` tag is escaped on the autocomplete endpoint
-- Date validation — `?date=abc` returns 200 with a toast, not 500
-- Pagination — `?page=99999` and `?page=abc` both return 200
-- Query count — customer list query count stays constant regardless of number of customers (no N+1)
-
----
-
-## Project Structure
-
-```
-cafe_pos_django_v2/
-├── cafe_pos/               # Django project config
-│   ├── settings.py         # WhiteNoise, security, env vars, password validators
-│   └── urls.py             # Root URL conf + media serving via serve()
-├── pos/                    # Main application
-│   ├── migrations/         # Database migrations (incl. Khata FK, Bill.created_by)
-│   ├── static/pos/         # Vendored JS (Chart.js 4.4.7), CSS
-│   ├── templatetags/       # url_replace template tag (pagination-safe links)
-│   ├── models.py           # Bill, Product, Customer, KhataTransaction, CustomerQuerySet
-│   ├── views.py            # All views with pagination, date parsing, annotated queries
-│   ├── forms.py            # MenuItemForm with stock, price, image, shortcut validation
-│   └── tests.py            # Full test suite
-├── templates/
-│   ├── base.html           # Nav sidebar, POST logout form
-│   ├── _pagination.html    # Shared pagination partial
-│   └── pos/                # Per-view templates
-├── backups/                # Auto-generated DB backups (git-ignored)
-├── media/                  # Uploaded product images (git-ignored)
-├── staticfiles/            # collectstatic output (git-ignored)
-├── .env.example            # Environment variable template
-└── requirements.txt
-```
-
----
-
-## Security Notes
-
-- Logout uses a **POST form** with CSRF token — not a bare `<a>` link (which Django 5 rejects with 405).
-- Customer autocomplete rebuilt with `createElement` / `textContent` — no `innerHTML` from server data.
-- Keyboard shortcuts ignore `Ctrl` / `Meta` / `Alt` to avoid hijacking browser shortcuts (except `Ctrl+Enter` = save).
-- `SESSION_COOKIE_HTTPONLY = True`, `SESSION_COOKIE_AGE = 43200` (12 h).
-- `X-Frame-Options: DENY` and `X-Content-Type-Options: nosniff` on every response.
-- Stock is decremented with `F("stock") - qty` inside `select_for_update()` + `transaction.atomic()`.
-- SQLite immediate transaction mode set (`OPTIONS: transaction_mode: IMMEDIATE`) to honour row locks.
-- Set `DJANGO_HTTPS=1` in `.env` to enable SSL redirect and secure cookies for HTTPS deployments.
-
----
-
-## Requirements
-
-See [`requirements.txt`](requirements.txt). Key dependencies:
-
-| Package | Purpose |
-|---------|---------|
-| Django 5.x | Web framework |
-| whitenoise | Compressed static file serving |
-| python-decouple | `.env` loading |
-| pillow | Image upload processing |
+Tests cover:
+- Role-based access control (Anonymous, Cashier, Owner)
+- Split billing, Cash tendered & change due, Khata transactions
+- Stock tracking and fractional decimal quantities
+- Bill voiding and authorization checks
+- Login throttling (lockout after 5 failures and release after expiry with mocked clock)
+- Report and dashboard financial calculations

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Suppliers & Vendors | Cafe POS{% endblock %}
+{% block eyebrow %}Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Suppliers & Vendors</h1>
+    <p>Manage raw material suppliers, vendor dues, and track purchase histories.</p>
+  </div>
+  <div class="actions">
+    <a href="{% url 'supplier_create' %}" class="btn btn-primary">+ Add Supplier</a>
+    <a href="{% url 'purchase_create' %}" class="btn btn-outline">🛒 New Purchase</a>
+    <a href="{% url 'stock_items' %}" class="btn btn-outline">📦 Stock Items</a>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: var(--space-5);">
+  <div class="card stat">
+    <div class="stat-label">Total Suppliers</div>
+    <div class="stat-value">{{ total_suppliers_count }}</div>
+    <div class="stat-note">Active trade partners</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Total Purchases</div>
+    <div class="stat-value">₹{{ total_purchases_sum|floatformat:2 }}</div>
+    <div class="stat-note">Cumulative invoice total</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Total Paid</div>
+    <div class="stat-value" style="color:var(--success);">₹{{ total_paid_sum|floatformat:2 }}</div>
+    <div class="stat-note">Settled purchase payments</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Outstanding Dues</div>
+    <div class="stat-value" style="color:{% if total_dues_sum > 0 %}var(--danger){% else %}var(--ink){% endif %};">
+      ₹{{ total_dues_sum|floatformat:2 }}
+    </div>
+    <div class="stat-note">Total payable across suppliers</div>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--space-3); margin-bottom:var(--space-4);">
+    <div style="display:flex; gap:var(--space-2); align-items:center; flex-wrap:wrap;">
+      <a href="{% url 'suppliers' %}" class="btn {% if not dues_only and not query %}btn-primary{% else %}btn-outline{% endif %}" style="min-height:36px; padding:6px 14px; font-size:13px;">
+        All Suppliers ({{ total_suppliers_count }})
+      </a>
+      <a href="{% url 'suppliers' %}?dues_only=1" class="btn {% if dues_only %}btn-danger{% else %}btn-outline{% endif %}" style="min-height:36px; padding:6px 14px; font-size:13px;">
+        ⚠️ With Outstanding Dues
+      </a>
+    </div>
+
+    <form method="get" action="{% url 'suppliers' %}" class="actions" style="margin:0;">
+      {% if dues_only %}<input type="hidden" name="dues_only" value="1">{% endif %}
+      <input type="text" name="q" value="{{ query }}" placeholder="Search supplier or phone..." style="min-width:220px; height:36px; padding:6px 12px; font-size:13px;">
+      <button type="submit" class="btn btn-outline" style="min-height:36px; padding:6px 14px; font-size:13px;">Search</button>
+      {% if query %}
+        <a href="{% url 'suppliers' %}{% if dues_only %}?dues_only=1{% endif %}" class="btn btn-soft" style="min-height:36px; padding:6px 12px; font-size:13px;">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Supplier</th>
+          <th>Phone</th>
+          <th>Total Purchases</th>
+          <th>Total Paid</th>
+          <th>Outstanding Due</th>
+          <th>Status</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in suppliers %}
+        <tr>
+          <td>
+            <a href="{% url 'supplier_detail' s.id %}" style="font-weight:700; color:var(--primary); text-decoration:none;">
+              {{ s.name }}
+            </a>
+            {% if s.notes %}
+              <div class="helptext" style="margin-top:2px; font-size:11px;">{{ s.notes|truncatechars:45 }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if s.phone %}
+              <a href="tel:{{ s.phone }}" style="color:var(--muted); text-decoration:none;">📞 {{ s.phone }}</a>
+            {% else %}
+              <span class="pill pill-muted">—</span>
+            {% endif %}
+          </td>
+          <td><b>₹{{ s.total_purchases|floatformat:2 }}</b></td>
+          <td style="color:var(--success);">₹{{ s.total_paid|floatformat:2 }}</td>
+          <td>
+            <b style="color:{% if s.outstanding_dues > 0 %}var(--danger){% else %}var(--ink){% endif %}; font-size:15px;">
+              ₹{{ s.outstanding_dues|floatformat:2 }}
+            </b>
+          </td>
+          <td>
+            {% if s.outstanding_dues > 0 %}
+              <span class="pill pill-danger" style="background:var(--danger-soft); color:var(--danger);">⚠️ Due</span>
+            {% else %}
+              <span class="pill pill-success">Settled</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <a href="{% url 'supplier_detail' s.id %}" class="btn btn-outline" style="min-height:32px; padding:4px 10px; font-size:12px;">View Ledger</a>
+            <a href="{% url 'supplier_edit' s.id %}" class="btn btn-outline" style="min-height:32px; padding:4px 10px; font-size:12px;">Edit</a>
+            <a href="{% url 'purchase_create' %}?supplier={{ s.id }}" class="btn btn-soft" style="min-height:32px; padding:4px 10px; font-size:12px;">+ Purchase</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" style="text-align:center; padding:var(--space-8); color:var(--muted);">
+            No suppliers found. <a href="{% url 'supplier_create' %}">Add your first supplier</a>.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:var(--space-4); padding-top:var(--space-4); border-top:1px solid var(--border);">
+    <div class="helptext">
+      Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    </div>
+    <div style="display:flex; gap:var(--space-2);">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}{% if dues_only %}&dues_only=1{% endif %}" class="btn btn-outline" style="min-height:32px; padding:4px 12px; font-size:12px;">&laquo; Previous</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}{% if dues_only %}&dues_only=1{% endif %}" class="btn btn-outline" style="min-height:32px; padding:4px 12px; font-size:12px;">Next &raquo;</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+

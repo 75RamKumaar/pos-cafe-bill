@@ -1,99 +1,393 @@
 {% extends "base.html" %}
-{% block title %}Billing | Cafe POS{% endblock %}
-{% block eyebrow %}Billing / New order{% endblock %}
+{% load i18n static %}
+{% block title %}{% trans "Billing" %} | Cafe POS{% endblock %}
+{% block eyebrow %}{% trans "Billing / New order" %}{% endblock %}
 {% block content %}
-<style>
-.billing-page{--billing-ink:#20252b;--billing-coral:#e85d3f;--billing-line:#e7eaed;--billing-muted:#74808a}
-.billing-head{align-items:center;margin-bottom:20px}.billing-head h1{font-size:30px;margin-bottom:4px}.billing-head p{margin:0}
-.billing-shortcut{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}.billing-shortcut input{max-width:240px;height:48px;border:2px solid #ffd1c6;font-weight:700;letter-spacing:.04em}.billing-shortcut input:focus{border-color:var(--billing-coral);box-shadow:0 0 0 4px #fff0ec}.shortcut-hint{font-size:12px;color:var(--billing-muted)}
-.billing-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,410px);gap:20px;align-items:start}.menu-card{padding:20px;min-width:0;width:100%}.menu-toolbar{display:flex;gap:12px;align-items:center;margin-bottom:16px}.menu-toolbar input{height:48px;flex:1;min-width:0}.menu-count{white-space:nowrap}
-.category-tabs{gap:8px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px 18px;scrollbar-width:thin}.category-tab{min-height:44px;padding:9px 15px;border-radius:12px;border:1px solid var(--billing-line);font-size:14px;white-space:nowrap}.category-tab.active{background:var(--billing-coral);border-color:var(--billing-coral);color:#fff;box-shadow:0 5px 12px rgba(232,93,63,.2)}
-.billing-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px;min-width:0;width:100%}.billing-product{min-height:132px;width:100%;padding:16px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:14px;background:#fff;border:1px solid var(--billing-line);border-radius:14px;color:var(--billing-ink);cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}.billing-product:hover,.billing-product:focus-visible{border-color:var(--billing-coral);box-shadow:0 8px 20px rgba(232,93,63,.12);outline:none;transform:translateY(-2px)}.billing-product:active{transform:scale(.98)}.billing-product-name{font-size:16px;line-height:1.25;font-weight:800}.billing-product-meta{display:flex;align-items:center;justify-content:space-between;width:100%;gap:8px}.billing-product-price{font-size:18px;color:var(--billing-coral);font-weight:900}.billing-product-shortcut{padding:4px 7px;border-radius:7px;background:#f2f4f5;color:var(--billing-muted);font-size:11px;font-weight:800;letter-spacing:.04em}
-.billing-panel{position:sticky;top:20px;max-height:calc(100vh - 40px);overflow:auto;width:100%}.cart-card{padding:20px;margin-bottom:0;width:100%;box-sizing:border-box}.cart-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:15px;border-bottom:1px solid var(--billing-line)}.cart-header h2{font-size:20px;margin:0 0 4px}.cart-header p{margin:0;font-size:12px;color:var(--billing-muted)}.cart-clear{min-height:40px;padding:8px 12px}.cart-list{min-height:96px;max-height:34vh;overflow:auto;margin:4px 0 12px}.cart-empty{min-height:110px;display:grid;place-items:center;text-align:center;padding:22px 10px;color:var(--billing-muted);font-size:13px}.cart-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:14px 0;border-bottom:1px solid var(--billing-line)}.cart-item:last-child{border-bottom:0}.cart-item-name{font-size:14px;font-weight:800;line-height:1.3}.cart-item-price{display:block;color:var(--billing-muted);font-size:12px;margin-top:4px}.cart-item-total{text-align:right;font-size:14px;font-weight:900}.quantity-stepper{display:flex;align-items:center;gap:8px;margin-top:9px}.quantity-stepper button{width:44px;height:44px;padding:0;border-radius:10px;font-size:23px;background:#f2f4f5;color:var(--billing-ink)}.quantity-stepper button:hover{background:#fff0ec;color:var(--billing-coral)}.quantity-stepper strong{min-width:22px;text-align:center}.cart-remove{border:0;background:transparent;color:var(--billing-muted);font-size:16px;line-height:1;padding:0;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer;flex-shrink:0;transition:background .15s,color .15s}.cart-remove:hover{background:#fde8e8;color:#c63d3d}.cart-summary{border-top:1px solid var(--billing-line);padding-top:10px}.summary-line{padding:5px 0}.discount-field{margin:12px 0}.discount-field input{height:44px}.grand-total{font-size:25px;padding:14px 0 4px;border-top:2px solid var(--billing-ink);margin-top:7px}.customer-suggestions{display:none;padding:6px;margin:6px 0 0;background:#fff;border:1px solid var(--billing-line);border-radius:10px}.customer-suggestions button{width:100%;min-height:42px;margin:2px 0;justify-content:flex-start}.payment-grid{gap:8px;grid-template-columns:repeat(auto-fit,minmax(70px,1fr))}.payment-option span{min-height:52px;display:grid;place-items:center;padding:10px 6px}.generate-bill{min-height:56px;font-size:16px;margin-top:4px}.billing-error{display:none;margin-top:12px}.mobile-total-dock{display:none}
-@media(max-width:1050px){.billing-layout{grid-template-columns:1fr}.billing-panel{position:sticky;top:20px;z-index:5;max-height:none;overflow:visible;width:100%}.billing-products{grid-template-columns:repeat(auto-fill,minmax(155px,1fr))}}
-@media(max-width:780px){.billing-head .btn{width:100%}.billing-shortcut{flex-direction:column;align-items:stretch}.billing-shortcut input{max-width:none}.shortcut-hint{font-size:11px}.billing-layout{display:flex;flex-direction:column;gap:14px;width:100%}.billing-panel{order:0;position:relative;top:auto;z-index:auto;max-height:none;overflow:visible;margin:0;width:100%}.cart-card{border-radius:var(--radius-lg);padding:16px;box-shadow:0 8px 20px rgba(32,37,43,.1);width:100%;margin-left:0;margin-right:0}.cart-list{max-height:28vh}.menu-card{padding:15px;width:100%}.menu-toolbar{display:block}.menu-toolbar input{margin-top:10px;width:100%}.menu-count{display:inline-flex;margin-top:10px}.billing-products{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.billing-product{min-height:112px;padding:12px}.billing-product-name{font-size:14px}.billing-product-price{font-size:15px}.mobile-total-dock{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;align-items:center;justify-content:space-between;gap:12px;padding:10px 15px calc(10px + env(safe-area-inset-bottom,0px)) 15px;background:var(--billing-ink);color:#fff;box-shadow:0 -8px 22px rgba(32,37,43,.18)}.mobile-total-dock small{display:block;color:#b9c1c7}.mobile-total-dock strong{font-size:20px}.mobile-total-dock button{min-height:42px;background:var(--billing-coral)}.billing-page{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
-@media(max-width:480px){.billing-products{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.billing-product{min-height:96px;padding:10px}.billing-product-name{font-size:13px}.billing-product-price{font-size:14px}.payment-grid{grid-template-columns:repeat(2,1fr)}}
-</style>
-<div class="billing-page">
-    <div class="page-head billing-head">
-        <div>
-            <h1>New bill</h1>
-            <p>Tap products to build the order. Your total stays visible while you work.</p>
-            <div class="billing-shortcut">
-                <label class="field-label" for="shortcutInput" style="margin:0">Quick add</label>
-                <input id="shortcutInput" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" placeholder="Code + Enter" aria-label="Product shortcut code">
-                <span id="shortcutFeedback" class="shortcut-hint">Type a code + Enter &nbsp;·&nbsp; or hold <kbd style="background:#f2f4f5;border:1px solid #d0d5da;border-radius:4px;padding:1px 5px;font-size:11px">Ctrl</kbd> + shortcut key anywhere</span>
-            </div>
-        </div>
-        <a class="btn btn-outline" href="{% url 'billing_history' %}">Billing history</a>
-    </div>
+<link rel="stylesheet" href="{% static 'pos/billing.css' %}">
+<div class="billing-page" data-bill-create-url="{% url 'bill_create' %}" data-customer-search-url="{% url 'customer_search' %}" data-held-list-url="{% url 'held_order_list' %}" data-held-hold-url="{% url 'held_order_hold' %}">
 
-    <div class="billing-layout">
-        <section class="card menu-card">
-            <div class="menu-toolbar">
-                <input id="productSearch" type="search" placeholder="Search menu" autocomplete="off" aria-label="Search menu products">
-                <span class="pill pill-success menu-count">{{ products|length }} active items</span>
+    <!-- POS Top Navigation & Status Chrome (Slate Dark 900) -->
+    <header class="pos-top-bar" role="banner">
+        <div class="pos-top-left">
+            <h1 class="pos-brand-title">{% trans "New bill" %}</h1>
+            <div class="pos-breadcrumb">
+                <span class="pos-brand-tag">☕ Cafe POS</span>
+                <span class="pos-crumb-sep">/</span>
+                <span class="pos-station-name">Terminal 01</span>
+                <span class="pos-crumb-sep">/</span>
+                <span class="pos-crumb-active">{% trans "New bill" %}</span>
             </div>
-            <div class="category-tabs" id="categoryTabs" role="tablist" aria-label="Product categories">
-                <button type="button" class="category-tab active" data-category="all" role="tab">All items</button>
-                {% for category in categories %}<button type="button" class="category-tab" data-category="{{ category }}" role="tab">{% if category %}{{ category }}{% else %}Uncategorized{% endif %}</button>{% endfor %}
+            {% if current_shift %}
+            <div class="pos-shift-badge shift-open" title="{% trans 'Shift active' %}">
+                <span class="pulse-dot"></span>
+                <span>{% trans "Cashier" %}: <strong>{{ request.user.username }}</strong></span>
+                <span class="badge-sep">|</span>
+                <span class="badge-ready">{% trans "Ready" %}</span>
             </div>
-            <div class="billing-products" id="productGrid">
-                {% for product in products %}
-                <button type="button" class="billing-product" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-stock="{{ product.stock }}" data-category="{{ product.category }}" data-shortcut="{{ product.shortcut_key }}" onclick="addItem({{ product.id }})">
-                    <span class="billing-product-name">{{ product.name }}</span>
-                    <span class="billing-product-meta"><span class="billing-product-price">₹{{ product.price|floatformat:2 }}</span>{% if product.shortcut_key %}<span class="billing-product-shortcut">{{ product.shortcut_key }}</span>{% endif %}</span>
-                </button>
-                {% empty %}<div class="cart-empty">No active menu items. Add one from Menu Items.</div>{% endfor %}
+            {% else %}
+            <a href="{% url 'shift_open' %}" class="pos-shift-badge shift-closed" title="{% trans 'Shift closed' %}">
+                <span class="alert-icon">⚠️</span>
+                <span>{% trans "Shift Closed" %} &mdash; <u>{% trans "Open Shift" %} &rarr;</u></span>
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Visual Keyboard Shortcut Legend -->
+        <div class="pos-shortcut-legend" aria-label="{% trans 'Keyboard shortcuts guide' %}">
+            <span class="legend-chip"><kbd>F2</kbd> {% trans "Search" %}</span>
+            <span class="legend-chip"><kbd>F4</kbd> {% trans "Hold" %}</span>
+            <span class="legend-chip"><kbd>F8</kbd> {% trans "Pay" %}</span>
+            <span class="legend-chip"><kbd>↵</kbd> {% trans "Charge" %}</span>
+            <span class="legend-chip"><kbd>Esc</kbd> {% trans "Reset" %}</span>
+        </div>
+
+        <!-- Secondary Action Buttons -->
+        <div class="pos-top-actions">
+            <button type="button" id="feedbackToggleBtn" class="pos-action-btn" onclick="toggleFeedback()" title="{% trans 'Audio / Haptic Feedback' %}">
+                <span id="feedbackIcon">🔕</span> <span id="feedbackLabel">Feedback: OFF</span>
+            </button>
+            <button type="button" id="heldOrdersChip" class="pos-action-btn held-chip" onclick="toggleHeldDrawer()" title="{% trans 'Held Orders (F4)' %}">
+                <span class="held-icon">⏸</span> <span id="heldOrdersChipLabel">Held (0)</span>
+            </button>
+            <button type="button" id="reprintLastBtn" class="pos-action-btn" onclick="reprintLastBill()" disabled title="{% trans 'Reprint Last Bill' %}">
+                <span>🖨️</span> {% trans "Reprint last" %}
+            </button>
+            <a class="pos-action-btn" href="{% url 'billing_history' %}" title="{% trans 'Billing History' %}">
+                <span>📋</span> {% trans "History" %}
+            </a>
+        </div>
+    </header>
+
+    {% if not current_shift %}
+    <div class="pos-shift-alert-banner" role="alert">
+        <span>⚠️ <strong>{% trans "No shift is open." %}</strong> {% trans "You must open a shift before creating bills." %}</span>
+        <a href="{% url 'shift_open' %}" class="btn btn-primary btn-sm">{% trans "Open Shift Now" %} &rarr;</a>
+    </div>
+    {% endif %}
+
+    <!-- 2-Pane Strict No-Scroll Layout: Left Pane (63%) & Right Pane (37%) -->
+    <div class="billing-layout" id="billingMainLayout">
+        
+        <!-- ================= LEFT PANE: CATALOG & QUICK-ENTRY TOOLS (63%) ================= -->
+        <section class="catalog-pane" aria-label="{% trans 'Menu catalog and quick entry' %}">
+            
+            <!-- Quick Add Barcode & Menu Search Row -->
+            <div class="catalog-toolbar">
+                <div class="quick-add-group">
+                    <span class="barcode-glyph" aria-hidden="true">║▌║</span>
+                    <input id="shortcutInput" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" placeholder="{% trans 'Code + Enter' %}" aria-label="{% trans 'Product shortcut code' %}">
+                    <span id="shortcutFeedback" class="shortcut-feedback-pill">{% trans "Code + Enter or" %} <kbd>Ctrl</kbd>+{% trans "key" %}</span>
+                </div>
+                <div class="catalog-search-group">
+                    <span class="search-glyph" aria-hidden="true">🔍</span>
+                    <input id="productSearch" type="search" placeholder="{% trans 'Search menu (F2)...' %}" autocomplete="off" aria-label="{% trans 'Search menu products' %}">
+                    <span class="catalog-count-pill">{{ products|length }} {% trans "items" %}</span>
+                </div>
+            </div>
+
+            <!-- Favorites Strip (Top 8 Best-Sellers Pinned at Top) -->
+            {% if favorites %}
+            <div class="favorites-section">
+                <div class="favorites-bar">
+                    <span class="favorites-tag">⭐ {% trans "Top 8" %}</span>
+                    <div class="favorites-strip" id="favoritesStrip" role="region" aria-label="{% trans 'Favorite items' %}">
+                        {% for product in favorites %}
+                        <button type="button" class="favorite-item-btn" data-id="{{ product.id }}" data-modifiers="{{ product.get_active_modifiers_json|escape }}" onclick="addItem({{ product.id }})">
+                            <span class="fav-dot"></span>
+                            <span class="fav-name">{{ product.display_name }}</span>
+                            <span class="fav-price">₹{{ product.price|floatformat:2 }}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Category Tabs (Horizontal Scrollable Pills) -->
+            <nav class="category-tabs-bar" aria-label="{% trans 'Product categories' %}">
+                <div class="category-tabs" id="categoryTabs" role="tablist">
+                    <button type="button" class="category-tab active" data-category="all" role="tab">{% trans "All Items" %}</button>
+                    {% for category in categories %}
+                    <button type="button" class="category-tab" data-category="{{ category }}" role="tab">{% if category %}{{ category }}{% else %}{% trans "Uncategorized" %}{% endif %}</button>
+                    {% endfor %}
+                </div>
+            </nav>
+
+            <!-- Menu Matrix (4x4 or 5x4 Grid of Uniform Touch Cards, min 84px height) -->
+            <div class="catalog-grid-container">
+                <div class="billing-products" id="productGrid" role="region" aria-label="{% trans 'Menu items matrix' %}">
+                    {% for product in products %}
+                    <button type="button" class="billing-product" data-id="{{ product.id }}" data-name="{{ product.display_name }}" data-price="{{ product.price }}" data-stock="{{ product.stock }}" data-tracked="{{ product.stock_tracked|yesno:'true,false' }}" data-category="{{ product.category }}" data-shortcut="{{ product.shortcut_key }}" data-modifiers="{{ product.get_active_modifiers_json|escape }}" onclick="addItem({{ product.id }})">
+                        <div class="product-card-top">
+                            <span class="billing-product-name">{{ product.display_name }}</span>
+                            <div class="product-badges">
+                                {% if product.shortcut_key %}
+                                <kbd class="billing-product-shortcut">{{ product.shortcut_key }}</kbd>
+                                {% endif %}
+                                {% if product.modifiers.count %}
+                                <span class="badge-opt">+opts</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="product-card-bottom">
+                            <span class="billing-product-price">₹{{ product.price|floatformat:2 }}</span>
+                            {% if product.stock_tracked %}
+                                {% if product.stock <= low_stock_threshold %}
+                                <span class="stock-pill stock-low">Low: {{ product.stock|floatformat:0 }}</span>
+                                {% else %}
+                                <span class="stock-pill stock-ok">{{ product.stock|floatformat:0 }} left</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </button>
+                    {% empty %}
+                    <div class="cart-empty catalog-empty-message">{% trans "No active menu items. Add products in Menu Items settings." %}</div>
+                    {% endfor %}
+                </div>
             </div>
         </section>
 
-        <aside class="billing-panel" id="cartPanel">
-            <div class="card cart-card">
-                <div class="cart-header"><div><h2>Current bill <span class="pill pill-muted" id="cartCount">0 items</span></h2><p>Adjust quantities before generating the bill.</p></div><button type="button" class="btn btn-soft cart-clear" onclick="clearCart()">Clear</button></div>
-                <div class="cart-list" id="cart"><div class="cart-empty">Your bill is empty.<br>Choose items from the menu.</div></div>
-                <div class="cart-summary">
-                    <div class="summary-line"><span>Subtotal</span><b>₹<span id="subtotal">0.00</span></b></div>
-                    <div class="field discount-field"><label class="field-label" for="discount">Discount</label><input id="discount" type="number" min="0" step="0.01" value="0" placeholder="0.00" oninput="renderCart()"></div>
-                    <div class="grand-total summary-line"><span>Total</span><b>₹<span id="grandTotal">0.00</span></b></div>
+        <!-- ================= RIGHT PANE: FIXED PERSISTENT CART & SETTLEMENT STATION (37%) ================= -->
+        <div id="cartSheetBackdrop" class="cart-sheet-backdrop" onclick="toggleCartSheet(false)"></div>
+        <aside class="billing-panel" id="cartPanel" aria-label="{% trans 'Cart and checkout settlement' %}">
+            <div class="cart-card">
+                
+                <!-- Mobile Handle & Header (visible on touch mobile viewports) -->
+                <div class="cart-sheet-handle"></div>
+                <div class="cart-sheet-header">
+                    <span class="cart-sheet-title">{% trans "Current Bill" %}</span>
+                    <button type="button" class="btn btn-soft btn-sm" onclick="toggleCartSheet(false)">{% trans "Close" %} &#x2715;</button>
                 </div>
-                <div class="field" style="margin-top:16px"><label class="field-label" for="customerSearch">Customer <span class="muted">(optional)</span></label><input id="customerSearch" type="search" placeholder="Name or phone" autocomplete="off"><input id="customer" type="hidden"><div id="customerSuggestions" class="customer-suggestions"></div><small id="selectedCustomer" class="muted">Walk-in customer</small></div>
-                <div class="field"><span class="field-label">Payment method</span><div class="payment-grid">{% for value,label in payment_methods %}<label class="payment-option"><input type="radio" name="payment_method" value="{{ value }}"{% if forloop.first %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}</div></div>
-                <div id="billingError" class="alert alert-error billing-error"></div>
-                <button type="button" id="generateBillButton" class="btn btn-primary generate-bill" onclick="saveBill()">Generate bill</button>
-            </div>
+
+                <!-- Cart Header: Current Bill #, Dine-in / Takeaway Toggle, Clear Button -->
+                <div class="cart-station-header">
+                    <div class="cart-meta-left">
+                        <span class="cart-bill-token">🧾 {% trans "Current Bill" %}</span>
+                        <span class="cart-count-badge" id="cartCount">0 {% trans "items" %}</span>
+                    </div>
+
+                    <!-- Dine-in / Takeaway Segmented Toggle -->
+                    <div class="order-type-switch" role="group" aria-label="{% trans 'Order type' %}">
+                        <button type="button" class="order-type-btn active" id="orderTypeDineIn" onclick="setOrderType('Dine-in')">
+                            🍽️ {% trans "Dine-in" %}
+                        </button>
+                        <button type="button" class="order-type-btn" id="orderTypeTakeaway" onclick="setOrderType('Takeaway')">
+                            🛍️ {% trans "Takeaway" %}
+                        </button>
+                    </div>
+
+                    <button type="button" class="cart-clear-btn" onclick="clearCart()" title="{% trans 'Clear Cart (Esc)' %}">
+                        {% trans "Clear" %} ✕
+                    </button>
+                </div>
+
+                <!-- Scrollable Cart Items Container -->
+                <div class="cart-items-wrapper">
+                    <div class="cart-list" id="cart">
+                        <div class="cart-empty">
+                            <span class="cart-empty-icon">🛒</span>
+                            <span>{% trans "Your bill is empty." %}<br><small>{% trans "Tap items from the menu or scan a barcode." %}</small></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fixed Bottom Settlement Station -->
+                <div class="settlement-station">
+
+                    <!-- Billing Summary & Prominent Total Payable Callout Box -->
+                    <div class="settlement-summary-box">
+                        <div class="summary-top-row">
+                            <div class="summary-subtotal-item">
+                                <span class="summary-label">{% trans "Subtotal" %}</span>
+                                <strong class="summary-val">₹<span id="subtotal">0.00</span></strong>
+                            </div>
+                            <div class="summary-discount-item">
+                                <label class="summary-label" for="discount">{% trans "Discount (₹)" %}</label>
+                                <input id="discount" type="number" min="0" step="0.01" value="0" placeholder="0.00" oninput="renderCart()">
+                            </div>
+                        </div>
+
+                        <!-- Bold Prominent Total Payable Badge in Distinct Callout Box (WCAG AAA) -->
+                        <div class="payable-callout-card">
+                            <div class="payable-callout-left">
+                                <span class="payable-callout-title">{% trans "Total Payable" %}</span>
+                                <small class="payable-callout-sub">{% trans "Net Amount" %}</small>
+                            </div>
+                            <div class="payable-callout-right">
+                                <span class="payable-currency">₹</span>
+                                <strong class="payable-amount-value" id="grandTotal">0.00</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Customer & Order Notes (Compact Section) -->
+                    <div class="customer-note-row">
+                        <div class="customer-picker-col">
+                            <div class="compact-input-wrap">
+                                <span class="input-icon">👤</span>
+                                <input id="customerSearch" type="search" placeholder="{% trans 'Customer (Name / Phone)' %}" autocomplete="off">
+                                <input id="customer" type="hidden">
+                            </div>
+                            <div id="customerSuggestions" class="customer-suggestions"></div>
+                            <div class="customer-status-line">
+                                <small id="selectedCustomer" class="selected-customer-badge">{% trans "Walk-in customer" %}</small>
+                            </div>
+                        </div>
+                        <div class="order-note-col">
+                            <div class="compact-input-wrap">
+                                <span class="input-icon">📝</span>
+                                <input id="billNote" type="text" placeholder="{% trans 'Order note (e.g. pack separately)' %}" autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2x2 Large Tactile Payment Method Buttons -->
+                    <div class="payment-section">
+                        <div class="payment-grid" id="paymentGrid" role="radiogroup" aria-label="{% trans 'Payment method' %}">
+                            {% for value,label in payment_methods %}
+                            <label class="payment-tile payment-tile-{{ value|lower }}">
+                                <input type="radio" name="payment_method" value="{{ value }}"{% if forloop.first %} checked{% endif %}>
+                                <div class="tile-content">
+                                    <span class="tile-icon">
+                                        {% if value == 'CASH' %}💵{% elif value == 'UPI' %}📱{% elif value == 'CARD' %}💳{% elif value == 'KHATA' %}📒{% else %}💳{% endif %}
+                                    </span>
+                                    <span class="tile-label">{{ label }}</span>
+                                    <kbd class="tile-kbd">{{ forloop.counter }}</kbd>
+                                </div>
+                            </label>
+                            {% endfor %}
+                        </div>
+
+                        <div class="split-toggle-row">
+                            <label class="split-checkbox-label">
+                                <input type="checkbox" id="splitPaymentToggle" onchange="toggleSplitPayment(this.checked)">
+                                <span>{% trans "Split Payment" %}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Split Payment Breakdown Drawer -->
+                    <div id="splitPaymentSection" class="split-payment-section" style="display:none">
+                        <div class="split-header">
+                            <span>{% trans "Split Breakdown" %}</span>
+                            <button type="button" class="btn btn-soft btn-xs" onclick="addSplitRow()">{% trans "+ Add Method" %}</button>
+                        </div>
+                        <div id="splitRowsContainer" class="split-rows-container"></div>
+                        <div class="split-remaining-bar">
+                            <span>{% trans "Remaining amount" %}</span>
+                            <strong id="splitRemaining">₹0.00</strong>
+                        </div>
+                    </div>
+
+                    <!-- Cash Tendered & Change Due Drawer -->
+                    <div id="cashTenderedSection" class="cash-tendered-section" style="display:none">
+                        <div class="tendered-input-row">
+                            <label for="tenderedAmount">{% trans "Tendered (₹)" %}</label>
+                            <input id="tenderedAmount" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateChangeDue()">
+                        </div>
+                        <div class="quick-cash-grid">
+                            <button type="button" class="btn-quick-cash" onclick="setQuickTendered('exact')">{% trans "Exact" %}</button>
+                            <button type="button" class="btn-quick-cash" onclick="setQuickTendered(10)">10</button>
+                            <button type="button" class="btn-quick-cash" onclick="setQuickTendered(20)">20</button>
+                            <button type="button" class="btn-quick-cash" onclick="setQuickTendered(50)">50</button>
+                            <button type="button" class="btn-quick-cash" onclick="setQuickTendered(100)">100</button>
+                            <button type="button" class="btn-quick-cash" onclick="setQuickTendered(200)">200</button>
+                            <button type="button" class="btn-quick-cash" onclick="setQuickTendered(500)">500</button>
+                        </div>
+                        <div class="change-due-box">
+                            <span class="change-due-label">{% trans "Change Due:" %}</span>
+                            <strong id="changeDueDisplay" class="change-due-value">₹0.00</strong>
+                        </div>
+                    </div>
+
+                    <!-- Offline Status & Error Messages -->
+                    <div id="billingOfflineWarning" class="billing-offline-alert" style="display:none">
+                        ⚠️ {% trans "Offline: Bill generation disabled until network restores." %}
+                    </div>
+                    <div id="billingError" class="alert alert-error billing-error"></div>
+
+                    <!-- Action Bar: Hold Bill (25%) + Charge / Generate Bill (75%) -->
+                    <div class="action-bar-footer">
+                        <button type="button" id="holdOrderButton" class="btn-hold-bill" onclick="holdCurrentOrder()" title="{% trans 'Hold current order (F4)' %}">
+                            <span class="btn-glyph"><kbd>F4</kbd></span>
+                            <span class="btn-text">{% trans "Hold" %}</span>
+                        </button>
+                        <button type="button" id="generateBillButton" class="btn-charge-bill" onclick="saveBill()" title="{% trans 'Charge / Generate Bill (Enter)' %}">
+                            <div class="charge-btn-content">
+                                <span class="charge-main-text">{% trans "Charge / Generate Bill" %}</span>
+                                <span class="charge-shortcut-badge"><kbd>Enter ↵</kbd></span>
+                            </div>
+                        </button>
+                    </div>
+
+                </div><!-- /.settlement-station -->
+            </div><!-- /.cart-card -->
         </aside>
+
+    </div><!-- /.billing-layout -->
+</div><!-- /.billing-page -->
+
+<!-- Held Orders Drawer (Slides in from right) -->
+<div id="heldDrawerBackdrop" class="cart-sheet-backdrop" onclick="toggleHeldDrawer(false)"></div>
+<aside id="heldDrawer" class="held-drawer" aria-label="{% trans 'Held orders drawer' %}">
+    <div class="held-drawer-header">
+        <div class="held-header-title">
+            <h2>{% trans "Held Orders" %}</h2>
+            <span id="heldDrawerCount" class="pill pill-muted">0</span>
+        </div>
+        <button type="button" class="btn btn-soft btn-sm" onclick="toggleHeldDrawer(false)">{% trans "Close" %} &#x2715;</button>
     </div>
+    <div id="heldOrdersList" class="held-drawer-list">
+        <div class="cart-empty">{% trans "No held orders.<br><small class=\"muted\">Press F4 or Hold to park an active bill.</small>" %}</div>
+    </div>
+</aside>
+
+<!-- Toast Notification -->
+<div id="billingToast" class="billing-toast" role="status" aria-live="polite"></div>
+
+<!-- Modifier Chooser Dialog -->
+<dialog id="modifierChooserDialog" class="modifier-chooser-dialog" aria-labelledby="modifierChooserTitle">
+    <div class="modifier-dialog-card">
+        <div class="modifier-dialog-header">
+            <div>
+                <h3 id="modifierChooserTitle">{% trans "Customize Item" %}</h3>
+                <span id="modifierChooserBasePrice" class="modifier-base-price">Base: ₹0.00</span>
+            </div>
+            <button type="button" class="btn-dialog-close" onclick="closeModifierChooser()">&#x2715;</button>
+        </div>
+        <div class="modifier-dialog-body">
+            <div class="modifier-prompt-label">{% trans "Choose modifiers / add-ons:" %}</div>
+            <div id="modifierChipsContainer" class="modifier-chips-container"></div>
+            <div class="modifier-note-group">
+                <label for="modifierItemNote">{% trans "Item special note" %} <span class="muted">({% trans "optional" %})</span></label>
+                <input id="modifierItemNote" type="text" placeholder="{% trans 'e.g. Extra spicy, less sugar' %}" autocomplete="off">
+            </div>
+        </div>
+        <div class="modifier-dialog-footer">
+            <div class="modifier-total-display">
+                <span class="muted">{% trans "Line price:" %} </span>
+                <strong id="modifierChooserLiveTotal">₹0.00</strong>
+            </div>
+            <div class="modifier-actions">
+                <button type="button" class="btn btn-outline" onclick="closeModifierChooser()">{% trans "Cancel" %}</button>
+                <button type="button" class="btn btn-primary" id="modifierChooserAddBtn" onclick="confirmModifierAdd()">{% trans "Add to Bill" %}</button>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+<!-- Silent Printing Iframe -->
+<iframe id="receiptPrintFrame" name="receiptPrintFrame" style="position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;" aria-hidden="true"></iframe>
+
+<!-- Mobile Bottom Floating Total Dock (visible only on narrow mobile viewports) -->
+<div class="mobile-total-dock">
+    <div>
+        <small><span id="mobileDockCount">0 {% trans "items" %}</span> {% trans "in bill" %}</small>
+        <strong>₹<span id="mobileDockTotal">0.00</span></strong>
+    </div>
+    <button type="button" onclick="toggleCartSheet(true)">{% trans "View bill" %}</button>
 </div>
-<div class="mobile-total-dock"><div><small><span id="mobileDockCount">0 items</span> in bill</small><strong>₹<span id="mobileDockTotal">0.00</span></strong></div><button type="button" onclick="document.getElementById('cartPanel').scrollIntoView({behavior:'smooth'})">View bill</button></div>
+
 <form style="display:none">{% csrf_token %}</form>
-<script>
-const cart = new Map();
-const products = {};
-const shortcutProducts = {};
-let shortcutBuffer = "";
-let shortcutTimer = null;
-let selectedCartId = null;
-document.querySelectorAll(".billing-product").forEach((button) => { const product={id:Number(button.dataset.id), name:button.dataset.name, price:Number(button.dataset.price), stock:Number(button.dataset.stock||0), category:button.dataset.category}; products[button.dataset.id]=product; if(button.dataset.shortcut)shortcutProducts[button.dataset.shortcut.toUpperCase()]=product; });
-function addItem(id){const product=products[id];if(!product)return;const key=String(id);const current=cart.get(key)||{...product,quantity:0};if(current.quantity>=product.stock){showShortcutFeedback(`Cannot add more. In stock: ${product.stock}`,true);return;}current.quantity++;cart.set(key,current);selectedCartId=key;renderCart();}
-function changeQuantity(id,delta){const item=cart.get(String(id));if(!item)return;if(delta>0&&item.quantity>=item.stock){showShortcutFeedback(`Cannot add more. In stock: ${item.stock}`,true);return;}item.quantity+=delta;if(item.quantity<=0)cart.delete(String(id));selectedCartId=String(id);renderCart();}
-function removeItem(id){cart.delete(String(id));if(selectedCartId===String(id))selectedCartId=null;renderCart();}
-function clearCart(){cart.clear();document.getElementById("discount").value="0";selectedCartId=null;renderCart();}
-function renderCart(){const cartEl=document.getElementById("cart");let subtotal=0;let count=0;if(!cart.size){cartEl.innerHTML='<div class="cart-empty">Your bill is empty.<br>Choose items from the menu.</div>';}else{cartEl.innerHTML=[...cart.values()].map(item=>{const total=item.price*item.quantity;subtotal+=total;count+=item.quantity;return `<div class="cart-item"><div><div class="cart-item-name">${escapeHtml(item.name)}</div><span class="cart-item-price">₹${item.price.toFixed(2)} each</span><div class="quantity-stepper"><button type="button" aria-label="Decrease ${escapeHtml(item.name)} quantity" onclick="changeQuantity(${item.id},-1)">-</button><strong>${item.quantity}</strong><button type="button" aria-label="Increase ${escapeHtml(item.name)} quantity" onclick="changeQuantity(${item.id},1)">+</button><button type="button" class="cart-remove" aria-label="Remove ${escapeHtml(item.name)} from cart" onclick="removeItem(${item.id})">&#215;</button></div></div><div class="cart-item-total">₹${total.toFixed(2)}</div></div>`}).join("");}if(!cart.size)subtotal=0;const discount=Math.max(0,Number(document.getElementById("discount").value)||0);const total=Math.max(0,subtotal-discount);document.getElementById("subtotal").textContent=subtotal.toFixed(2);document.getElementById("grandTotal").textContent=total.toFixed(2);document.getElementById("cartCount").textContent=`${count} item${count===1?"":"s"}`;document.getElementById("mobileDockCount").textContent=`${count} item${count===1?"":"s"}`;document.getElementById("mobileDockTotal").textContent=total.toFixed(2);}
-function escapeHtml(value){return value.replace(/[&<>'"]/g,(character)=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));}
-function getCookie(name){const row=document.cookie.split("; ").find((part)=>part.startsWith(name+"="));return row?decodeURIComponent(row.split("=")[1]):"";}
-function showShortcutFeedback(message,isError=false){const feedback=document.getElementById("shortcutFeedback");feedback.textContent=message;feedback.style.color=isError?"#c63d3d":"";}
-function addShortcutCode(code){const product=shortcutProducts[code.trim().toUpperCase()];if(!product){showShortcutFeedback(`No product for ${code.trim()||"that code"}`,true);return false;}addItem(product.id);showShortcutFeedback(`Added ${product.name}`);return true;}
-async function saveBill(){const error=document.getElementById("billingError");error.style.display="none";if(!cart.size){error.textContent="Add at least one item before saving.";error.style.display="block";return;}const payment=document.querySelector('input[name="payment_method"]:checked');const customerId=document.getElementById("customer").value||null;if(payment&&payment.value==="KHATA"&&!customerId){error.textContent="A customer is required for Khata credit checkout.";error.style.display="block";return;}const generateButton=document.getElementById("generateBillButton");generateButton.disabled=true;generateButton.classList.add("loading");generateButton.textContent="Generating bill...";const payload={items:[...cart.values()].map(item=>({id:item.id,quantity:item.quantity})),discount:document.getElementById("discount").value||"0",customer_id:customerId,payment_method:payment?payment.value:""};try{const response=await fetch("{% url 'bill_create' %}",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":getCookie("csrftoken")},body:JSON.stringify(payload)});const data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to generate this bill.");window.location.href=data.detail_url;}catch(requestError){error.textContent=requestError.message;error.style.display="block";generateButton.disabled=false;generateButton.classList.remove("loading");generateButton.textContent="Generate bill";}}
-const shortcutInput=document.getElementById("shortcutInput");shortcutInput.addEventListener("keydown",(event)=>{if(event.key!=="Enter")return;event.preventDefault();const code=shortcutInput.value;addShortcutCode(code);shortcutInput.value="";});
-const customerSearch=document.getElementById("customerSearch");const customerSuggestions=document.getElementById("customerSuggestions");customerSearch.addEventListener("input",async()=>{const query=customerSearch.value.trim();document.getElementById("customer").value="";document.getElementById("selectedCustomer").textContent="Walk-in customer";if(!query){customerSuggestions.style.display="none";return;}customerSuggestions.innerHTML='<span class="loading-inline">Searching customers...</span>';customerSuggestions.style.display="block";try{const response=await fetch(`{% url 'customer_search' %}?q=${encodeURIComponent(query)}`);if(!response.ok)throw new Error("Search unavailable");const data=await response.json();customerSuggestions.innerHTML="";if(data.customers.length){data.customers.forEach(customer=>{const btn=document.createElement("button");btn.type="button";btn.className="btn btn-outline";btn.textContent=customer.name+(customer.phone?` - ${customer.phone}`:"");btn.addEventListener("click",()=>{selectCustomer(customer.id,customer.name);});customerSuggestions.appendChild(btn);});}else{const emptySpan=document.createElement("span");emptySpan.className="muted";emptySpan.textContent="No matching customer";customerSuggestions.appendChild(emptySpan);}}catch(searchError){customerSuggestions.innerHTML='<span class="muted">Customer search unavailable.</span>';}});
-function selectCustomer(id,name){document.getElementById("customer").value=id;document.getElementById("customerSearch").value=name;document.getElementById("selectedCustomer").textContent=`Selected: ${name}`;customerSuggestions.style.display="none";}
-function filterProducts(){const query=document.getElementById("productSearch").value.trim().toLowerCase();const category=document.querySelector(".category-tab.active").dataset.category;document.querySelectorAll(".billing-product").forEach((item)=>{const matchesCategory=category==="all"||item.dataset.category===category;const matchesQuery=!query||item.dataset.name.toLowerCase().includes(query);item.style.display=matchesCategory&&matchesQuery?"flex":"none";});}
-document.querySelectorAll(".category-tab").forEach((tab)=>tab.addEventListener("click",()=>{document.querySelectorAll(".category-tab").forEach((item)=>item.classList.remove("active"));tab.classList.add("active");filterProducts();}));document.getElementById("productSearch").addEventListener("input",filterProducts);
-function clearShortcutBuffer(){shortcutBuffer="";if(shortcutTimer){clearTimeout(shortcutTimer);shortcutTimer=null;}}
-function commitShortcut(){const code=shortcutBuffer;clearShortcutBuffer();if(code)addShortcutCode(code);}
-function handleShortcutCharacter(character){const candidate=shortcutBuffer+character;if(shortcutBuffer&&shortcutProducts[candidate]){shortcutBuffer=candidate;commitShortcut();return;}if(shortcutBuffer&&shortcutProducts[shortcutBuffer]){commitShortcut();shortcutBuffer=character;shortcutTimer=setTimeout(commitShortcut,500);return;}if(shortcutBuffer)clearShortcutBuffer();shortcutBuffer=character;shortcutTimer=setTimeout(commitShortcut,500);}
-document.addEventListener("keydown",(event)=>{const target=event.target;if(target.matches("input, textarea, select, [contenteditable='true']"))return;if(event.ctrlKey&&event.key==="Enter"){event.preventDefault();saveBill();return;}if(event.ctrlKey&&/^[a-zA-Z0-9]$/.test(event.key)){const product=shortcutProducts[event.key.toUpperCase()];if(product){event.preventDefault();addItem(product.id);showShortcutFeedback(`Added ${product.name}`);}return;}if(event.metaKey||event.altKey)return;if(event.key==="Escape"){clearShortcutBuffer();return;}if(event.key==="Delete"&&selectedCartId){removeItem(selectedCartId);return;}if(event.key==="+"&&selectedCartId){changeQuantity(selectedCartId,1);return;}if(event.key==="-"&&selectedCartId){changeQuantity(selectedCartId,-1);return;}if(/^[a-zA-Z0-9]$/.test(event.key))handleShortcutCharacter(event.key.toUpperCase());});
-renderCart();shortcutInput.focus();
-</script>
+<script src="{% static 'pos/billing.js' %}"></script>
 {% endblock %}

@@ -3,6 +3,204 @@
 {% block eyebrow %}Workspace / Settings{% endblock %}
 {% block content %}
 <div class="page-head"><div><h1>Settings</h1><p>Current workspace configuration.</p></div></div>
-<div class="card" style="max-width:760px"><h3>Business / Profile</h3><form method="post">{% csrf_token %}{% for field in form %}<div class="field"><label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<small class="negative">{{ error }}</small>{% endfor %}</div>{% endfor %}<button class="btn btn-primary" type="submit">Save Settings</button></form></div>
-<div class="card" style="max-width:760px"><div class="row"><span class="muted">Timezone</span><b>Asia/Kolkata</b></div><div class="row"><span class="muted">Data storage</span><b>Local SQLite database</b></div></div>
+<form method="post">
+  {% csrf_token %}
+  <div class="card" style="max-width:760px">
+    <h3>Business / Profile</h3>
+    {% for field in form %}
+      {% if field.name not in "printer_enabled printer_type printer_address printer_paper_width printer_cut printer_drawer_kick printer_counter_slip" %}
+        <div class="field" {% if field.field.widget.input_type == "checkbox" %}style="display:flex;align-items:center;gap:10px;"{% endif %}>
+          {% if field.field.widget.input_type == "checkbox" %}
+            {{ field }}
+            <div>
+              <label class="field-label" for="{{ field.id_for_label }}" style="margin:0;cursor:pointer;font-weight:700;">{{ field.label }}</label>
+              {% if field.help_text %}<small class="muted" style="display:block;">{{ field.help_text }}</small>{% endif %}
+            </div>
+          {% else %}
+            <label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<small class="muted" style="display:block;margin-top:4px;">{{ field.help_text }}</small>{% endif %}
+          {% endif %}
+          {% for error in field.errors %}<small class="negative">{{ error }}</small>{% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="card" style="max-width:760px;margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h3 style="margin:0;">Thermal ESC/POS Printer</h3>
+        <p class="muted" style="margin:2px 0 0 0;font-size:13px;">Direct hardware printing to ESC/POS thermal printers via USB, Network, or Serial connections.</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-soft" type="button" id="testPrintBtn" onclick="runTestPrint()">🖨️ Test Print</button>
+        <button class="btn btn-soft" type="submit" name="test_print" value="1" id="testPrintFallbackBtn" style="display:none;">Test Print</button>
+      </div>
+    </div>
+
+    <div id="testPrintStatusAlert" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:8px;font-size:13px;line-height:1.4;"></div>
+
+    <div class="field" style="display:flex;align-items:center;gap:10px;">
+      {{ form.printer_enabled }}
+      <div>
+        <label class="field-label" for="{{ form.printer_enabled.id_for_label }}" style="margin:0;cursor:pointer;font-weight:700;">{{ form.printer_enabled.label }}</label>
+        <small class="muted" style="display:block;">{{ form.printer_enabled.help_text }}</small>
+      </div>
+      {% for error in form.printer_enabled.errors %}<small class="negative">{{ error }}</small>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.printer_type.id_for_label }}">{{ form.printer_type.label }}</label>
+      {{ form.printer_type }}
+      {% if form.printer_type.help_text %}<small class="muted" style="display:block;margin-top:4px;">{{ form.printer_type.help_text }}</small>{% endif %}
+      {% for error in form.printer_type.errors %}<small class="negative">{{ error }}</small>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.printer_address.id_for_label }}">{{ form.printer_address.label }}</label>
+      {{ form.printer_address }}
+      <small class="muted" style="display:block;margin-top:4px;">{{ form.printer_address.help_text }}</small>
+      {% for error in form.printer_address.errors %}<small class="negative">{{ error }}</small>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.printer_paper_width.id_for_label }}">{{ form.printer_paper_width.label }}</label>
+      {{ form.printer_paper_width }}
+      {% if form.printer_paper_width.help_text %}<small class="muted" style="display:block;margin-top:4px;">{{ form.printer_paper_width.help_text }}</small>{% endif %}
+      {% for error in form.printer_paper_width.errors %}<small class="negative">{{ error }}</small>{% endfor %}
+    </div>
+
+    <div class="field" style="display:flex;align-items:center;gap:10px;">
+      {{ form.printer_cut }}
+      <div>
+        <label class="field-label" for="{{ form.printer_cut.id_for_label }}" style="margin:0;cursor:pointer;font-weight:700;">{{ form.printer_cut.label }}</label>
+        <small class="muted" style="display:block;">{{ form.printer_cut.help_text }}</small>
+      </div>
+      {% for error in form.printer_cut.errors %}<small class="negative">{{ error }}</small>{% endfor %}
+    </div>
+
+    <div class="field" style="display:flex;align-items:center;gap:10px;">
+      {{ form.printer_drawer_kick }}
+      <div>
+        <label class="field-label" for="{{ form.printer_drawer_kick.id_for_label }}" style="margin:0;cursor:pointer;font-weight:700;">{{ form.printer_drawer_kick.label }}</label>
+        <small class="muted" style="display:block;">{{ form.printer_drawer_kick.help_text }}</small>
+      </div>
+      {% for error in form.printer_drawer_kick.errors %}<small class="negative">{{ error }}</small>{% endfor %}
+    </div>
+
+    <div class="field" style="display:flex;align-items:center;gap:10px;">
+      {{ form.printer_counter_slip }}
+      <div>
+        <label class="field-label" for="{{ form.printer_counter_slip.id_for_label }}" style="margin:0;cursor:pointer;font-weight:700;">{{ form.printer_counter_slip.label }}</label>
+        <small class="muted" style="display:block;">{{ form.printer_counter_slip.help_text }}</small>
+      </div>
+      {% for error in form.printer_counter_slip.errors %}<small class="negative">{{ error }}</small>{% endfor %}
+    </div>
+  </div>
+
+  <div style="max-width:760px;margin-top:20px;">
+    <button class="btn btn-primary" type="submit" style="min-height:42px;padding:0 24px;">Save Settings</button>
+  </div>
+</form>
+
+<script>
+async function runTestPrint() {
+  const btn = document.getElementById('testPrintBtn');
+  const alertEl = document.getElementById('testPrintStatusAlert');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+  }
+  if (alertEl) {
+    alertEl.style.display = 'block';
+    alertEl.style.background = '#f3f4f6';
+    alertEl.style.color = '#374151';
+    alertEl.style.border = '1px solid #d1d5db';
+    alertEl.textContent = 'Sending test print to configured thermal printer...';
+  }
+  try {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    const res = await fetch('{% url "test_print_endpoint" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      }
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      if (alertEl) {
+        alertEl.style.background = '#ecfdf5';
+        alertEl.style.color = '#065f46';
+        alertEl.style.border = '1px solid #a7f3d0';
+        alertEl.textContent = '✓ ' + (data.message || 'Test receipt printed successfully!');
+      }
+    } else {
+      if (alertEl) {
+        alertEl.style.background = '#fef2f2';
+        alertEl.style.color = '#991b1b';
+        alertEl.style.border = '1px solid #fecaca';
+        alertEl.textContent = '✗ ' + (data.error || 'Test print failed.');
+      }
+    }
+  } catch (err) {
+    if (alertEl) {
+      alertEl.style.background = '#fef2f2';
+      alertEl.style.color = '#991b1b';
+      alertEl.style.border = '1px solid #fecaca';
+      alertEl.textContent = '✗ Request error: ' + err.message;
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🖨️ Test Print';
+    }
+  }
+}
+</script>
+
+<div class="card" style="max-width:760px;margin-top:20px;">
+  <div class="row" style="padding-top:0;align-items:center;">
+    <div>
+      <h3 style="margin-bottom:4px;">Database Backup</h3>
+      <p class="muted" style="margin:0;font-size:13px;">Create a verified SQLite online backup. Up to 30 recent backups are retained.</p>
+    </div>
+    <form method="post" style="margin:0;">
+      {% csrf_token %}
+      <button class="btn btn-soft" type="submit" name="backup_now" value="1">Backup now</button>
+    </form>
+  </div>
+  <div style="margin-top:16px;border-top:1px solid var(--border-color, #e5e7eb);padding-top:14px;">
+    <div class="row">
+      <span class="muted">Backup directory</span>
+      <div style="text-align:right;">
+        <code>{{ backup_directory }}</code>
+        {% if last_backup.dir_exists %}
+          <span class="pill pill-success" style="font-size:10px;margin-left:6px;">Ready</span>
+        {% else %}
+          <span class="pill pill-danger" style="font-size:10px;margin-left:6px;">Missing / Unplugged</span>
+        {% endif %}
+      </div>
+    </div>
+    {% if not last_backup.dir_exists %}
+      <div class="alert alert-error" style="margin-top:10px;font-size:13px;">
+        ⚠️ Configured backup path is not accessible. If targeting a USB drive, please ensure the drive is plugged in with write permissions.
+      </div>
+    {% endif %}
+    {% if last_backup and last_backup.exists %}
+      <div class="row"><span class="muted">Last backup</span><b>{{ last_backup.time|date:"d M Y, h:i A" }}</b></div>
+      <div class="row"><span class="muted">Backup size</span><b>{{ last_backup.size_str }}</b></div>
+      <div class="row"><span class="muted">Latest file</span><code>{{ last_backup.name }}</code></div>
+      <div class="row"><span class="muted">Retained backups</span><span><b>{{ last_backup.count }}</b> / 30 max</span></div>
+    {% else %}
+      <div class="row"><span class="muted">Last backup</span><span class="muted">No backups found</span></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card" style="max-width:760px;margin-top:20px;">
+  <div class="row"><span class="muted">Timezone</span><b>Asia/Kolkata</b></div>
+  <div class="row"><span class="muted">Data storage</span><b>Local SQLite database</b></div>
+</div>
 {% endblock %}

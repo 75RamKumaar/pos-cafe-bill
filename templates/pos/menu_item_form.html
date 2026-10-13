@@ -2,11 +2,218 @@
 {% block title %}{{ page_title }} | Cafe POS{% endblock %}
 {% block eyebrow %}Menu / Edit catalog{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>{{ page_title }}</h1><p>Make this item available for fast billing.</p></div><a class="btn btn-outline" href="{% url 'menu_items' %}">← Back to Menu</a></div>
-<div class="card" style="max-width:760px">
-<form method="post" enctype="multipart/form-data">{% csrf_token %}
-{% for field in form %}<div class="field"><label class="field-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>{{ field }}{% if field.errors %}{% for error in field.errors %}<div class="negative" style="margin-top:5px">{{ error }}</div>{% endfor %}{% endif %}{% if field.help_text %}<div class="helptext">{{ field.help_text }}</div>{% endif %}</div>{% endfor %}
-{% if form.non_field_errors %}{% for error in form.non_field_errors %}<div class="negative">{{ error }}</div>{% endfor %}{% endif %}
-<div class="actions"><button type="submit" class="btn-primary">{{ submit_label }}</button><a class="btn btn-outline" href="{% url 'menu_items' %}">Cancel</a></div>
-</form></div>
+<style>
+.modifier-checkboxes{list-style:none;padding:0;margin:8px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;}
+.modifier-checkboxes li label{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer;background:#f8fafc;padding:8px 12px;border-radius:8px;border:1px solid #e2e8f0;}
+.recipe-section { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 2px dashed var(--border); }
+.recipe-table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 12px; }
+.recipe-table th { font-size: 12px; text-transform: uppercase; color: var(--muted); padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.recipe-table td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.recipe-cost-banner { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin: 12px 0; display: flex; justify-content: space-between; align-items: center; }
+</style>
+
+<div class="page-head">
+  <div>
+    <h1>{{ page_title }}</h1>
+    <p>Configure menu item pricing, modifiers, and raw material recipe ingredients.</p>
+  </div>
+  <a class="btn btn-outline" href="{% url 'menu_items' %}">← Back to Menu</a>
+</div>
+
+<div class="card" style="max-width:800px">
+  <form method="post" enctype="multipart/form-data" id="menuItemForm">
+    {% csrf_token %}
+    <input type="hidden" name="has_recipe_form" value="1">
+
+    {% for field in form %}
+      <div class="field" id="field-wrap-{{ field.name }}">
+        {% if field.field.widget.input_type == "checkbox" %}
+          <label class="field-label" style="display:inline-flex;align-items:center;gap:10px;cursor:pointer" for="{{ field.id_for_label }}">
+            {{ field }} <span>{{ field.label }}</span>
+          </label>
+        {% else %}
+          <label class="field-label" for="{{ field.id_for_label }}">
+            {{ field.label }}{% if field.field.required %} *{% endif %}
+          </label>
+          {{ field }}
+        {% endif %}
+        {% if field.errors %}
+          {% for error in field.errors %}<div class="negative" style="margin-top:5px">{{ error }}</div>{% endfor %}
+        {% endif %}
+        {% if field.help_text %}
+          <div class="helptext">{{ field.help_text }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    {% if form.non_field_errors %}
+      {% for error in form.non_field_errors %}<div class="negative">{{ error }}</div>{% endfor %}
+    {% endif %}
+
+    <!-- INLINE RECIPE EDITOR -->
+    <div class="recipe-section">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+        <div>
+          <h3 style="margin:0 0 4px; font-size:16px;">🧪 Ingredient Recipe (Bill of Materials)</h3>
+          <p class="helptext" style="margin:0;">
+            Define raw materials used per unit sold (e.g. 0.200 L Milk, 0.015 kg Tea). On sale, these are deducted automatically from stock. Cost Price is dynamically derived from ingredient costs.
+          </p>
+        </div>
+        <button type="button" class="btn btn-outline" id="addRecipeRowBtn" style="font-size:12px; padding:4px 12px; white-space:nowrap;">
+          + Add Ingredient
+        </button>
+      </div>
+
+      <div class="recipe-cost-banner" id="recipeBanner" style="display:none;">
+        <div>
+          <strong style="color:#166534; font-size:14px;">Derived Recipe Cost:</strong>
+          <span style="font-size:18px; font-weight:800; color:#15803d; margin-left:6px;" id="derivedCostDisplay">₹0.00</span>
+          <span class="helptext" style="display:block; margin-top:2px;">Sum of ingredients at current purchase costs.</span>
+        </div>
+        <span class="pill pill-success" style="background:#dcfce7; color:#166534; font-weight:700;">Recipe Active</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="recipe-table" id="recipeTable">
+          <thead>
+            <tr>
+              <th style="min-width:200px;">Raw Material / Stock Item</th>
+              <th style="width:130px;">Qty per Unit</th>
+              <th style="width:70px;">Unit</th>
+              <th style="width:110px;">Cost / Unit</th>
+              <th style="width:100px;">Line Cost</th>
+              <th style="width:40px; text-align:center;"></th>
+            </tr>
+          </thead>
+          <tbody id="recipeRows">
+            {% for rl in recipe_lines %}
+            <tr class="recipe-row">
+              <td>
+                <select name="recipe_stock_item" class="stock-item-select" style="width:100%; height:36px;" onchange="updateRecipeRow(this)">
+                  <option value="">-- Select Raw Material --</option>
+                  {% for si in stock_items %}
+                    <option value="{{ si.id }}" data-unit="{{ si.unit }}" data-cost="{{ si.cost_per_unit }}" {% if si.id == rl.stock_item_id %}selected{% endif %}>
+                      {{ si.name }} (₹{{ si.cost_per_unit }}/{{ si.unit }})
+                    </option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <input type="number" step="0.0001" min="0.0001" name="recipe_qty" value="{{ rl.qty_per_unit }}" class="recipe-qty-input" placeholder="0.00" style="width:100%; height:36px;" oninput="recalcRecipeTotals()">
+              </td>
+              <td class="unit-cell" style="color:var(--muted); font-size:13px;">{{ rl.stock_item.unit }}</td>
+              <td class="cost-cell" style="font-size:13px;">₹{{ rl.stock_item.cost_per_unit|floatformat:2 }}</td>
+              <td class="line-cost-cell" style="font-weight:700; font-size:13px;">₹{{ rl.line_cost|floatformat:2 }}</td>
+              <td style="text-align:center;">
+                <button type="button" class="btn btn-soft" style="color:var(--danger); padding:2px 8px; min-height:0; font-size:16px;" onclick="removeRecipeRow(this)">✕</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div id="noRecipeMsg" style="text-align:center; padding:16px; color:var(--muted); font-size:13px; border:1px dashed var(--border); border-radius:6px; {% if recipe_lines %}display:none;{% endif %}">
+        No ingredients added yet. Click <b>+ Add Ingredient</b> to define a recipe, or leave empty to use manual cost price.
+      </div>
+    </div>
+
+    <div class="actions" style="margin-top:var(--space-6);">
+      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+      <a class="btn btn-outline" href="{% url 'menu_items' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<template id="recipeRowTemplate">
+  <tr class="recipe-row">
+    <td>
+      <select name="recipe_stock_item" class="stock-item-select" style="width:100%; height:36px;" onchange="updateRecipeRow(this)">
+        <option value="">-- Select Raw Material --</option>
+        {% for si in stock_items %}
+          <option value="{{ si.id }}" data-unit="{{ si.unit }}" data-cost="{{ si.cost_per_unit }}">
+            {{ si.name }} (₹{{ si.cost_per_unit }}/{{ si.unit }})
+          </option>
+        {% endfor %}
+      </select>
+    </td>
+    <td>
+      <input type="number" step="0.0001" min="0.0001" name="recipe_qty" value="" class="recipe-qty-input" placeholder="0.00" style="width:100%; height:36px;" oninput="recalcRecipeTotals()">
+    </td>
+    <td class="unit-cell" style="color:var(--muted); font-size:13px;">—</td>
+    <td class="cost-cell" style="font-size:13px;">—</td>
+    <td class="line-cost-cell" style="font-weight:700; font-size:13px;">₹0.00</td>
+    <td style="text-align:center;">
+      <button type="button" class="btn btn-soft" style="color:var(--danger); padding:2px 8px; min-height:0; font-size:16px;" onclick="removeRecipeRow(this)">✕</button>
+    </td>
+  </tr>
+</template>
+
+<script>
+function addRecipeRow() {
+  const tpl = document.getElementById('recipeRowTemplate');
+  const clone = tpl.content.cloneNode(true);
+  document.getElementById('recipeRows').appendChild(clone);
+  document.getElementById('noRecipeMsg').style.display = 'none';
+  recalcRecipeTotals();
+}
+
+function removeRecipeRow(btn) {
+  const row = btn.closest('tr');
+  row.remove();
+  const rows = document.querySelectorAll('#recipeRows tr');
+  if (rows.length === 0) {
+    document.getElementById('noRecipeMsg').style.display = 'block';
+  }
+  recalcRecipeTotals();
+}
+
+function updateRecipeRow(select) {
+  const row = select.closest('tr');
+  const opt = select.options[select.selectedIndex];
+  const unit = opt.getAttribute('data-unit') || '—';
+  const cost = parseFloat(opt.getAttribute('data-cost')) || 0;
+  row.querySelector('.unit-cell').textContent = unit;
+  row.querySelector('.cost-cell').textContent = '₹' + cost.toFixed(2);
+  recalcRecipeTotals();
+}
+
+function recalcRecipeTotals() {
+  let totalCost = 0;
+  let hasValid = false;
+  document.querySelectorAll('#recipeRows tr').forEach(row => {
+    const sel = row.querySelector('.stock-item-select');
+    const opt = sel ? sel.options[sel.selectedIndex] : null;
+    const cost = opt ? (parseFloat(opt.getAttribute('data-cost')) || 0) : 0;
+    const qtyInput = row.querySelector('.recipe-qty-input');
+    const qty = qtyInput ? (parseFloat(qtyInput.value) || 0) : 0;
+    const lineCost = qty * cost;
+    row.querySelector('.line-cost-cell').textContent = '₹' + lineCost.toFixed(2);
+    if (sel && sel.value && qty > 0) {
+      hasValid = true;
+      totalCost += lineCost;
+    }
+  });
+
+  const banner = document.getElementById('recipeBanner');
+  const display = document.getElementById('derivedCostDisplay');
+  const costInput = document.getElementById('id_cost_price');
+
+  if (hasValid) {
+    banner.style.display = 'flex';
+    display.textContent = '₹' + totalCost.toFixed(2);
+    if (costInput) {
+      costInput.value = totalCost.toFixed(2);
+    }
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+document.getElementById('addRecipeRowBtn').addEventListener('click', addRecipeRow);
+
+// Initial calculation on load
+window.addEventListener('DOMContentLoaded', () => {
+  recalcRecipeTotals();
+});
+</script>
 {% endblock %}

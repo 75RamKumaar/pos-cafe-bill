@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title|default:"Supplier" }} | Cafe POS{% endblock %}
+{% block eyebrow %}Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ page_title|default:"Supplier" }}</h1>
+    <p>Manage raw material supplier details, contact information, and billing terms.</p>
+  </div>
+  <div class="actions">
+    <a href="{% url 'suppliers' %}" class="btn btn-outline">Back to Suppliers</a>
+  </div>
+</div>
+
+<div class="card" style="max-width: 640px;">
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="field">
+      <label class="field-label" for="{{ form.name.id_for_label }}">Supplier Name *</label>
+      {{ form.name }}
+      {% if form.name.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.name.errors|striptags }}</div>{% endif %}
+      <div class="helptext">e.g. Metro Dairy, City Gas Agency, Star Grocery Wholesalers</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.phone.id_for_label }}">Phone / Contact</label>
+      {{ form.phone }}
+      {% if form.phone.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.phone.errors|striptags }}</div>{% endif %}
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.notes.id_for_label }}">Notes / Address / Terms</label>
+      {{ form.notes }}
+      {% if form.notes.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.notes.errors|striptags }}</div>{% endif %}
+      <div class="helptext">Payment cycle, delivery schedules, bank details, or address.</div>
+    </div>
+
+    <div style="display:flex; gap:var(--space-3); margin-top:var(--space-6);">
+      <button type="submit" class="btn btn-primary" style="flex:1;">{{ submit_label|default:"Save Supplier" }}</button>
+      <a href="{% url 'suppliers' %}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+

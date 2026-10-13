@@ -1,0 +1,472 @@
+/* Receipt Stylesheet - Cafe POS */
+
+.bill-page {
+    --bill-ink: #20252b;
+    --bill-coral: #e85d3f;
+    --bill-muted: #74808a;
+    --bill-line: #e7eaed;
+}
+
+.bill-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.bill-actions-left,
+.bill-mode-toggle {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.bill-mode-toggle {
+    padding: 4px;
+    background: #eef0f2;
+    border-radius: 12px;
+}
+
+.bill-mode-toggle a {
+    padding: 9px 13px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 800;
+    text-decoration: none;
+    color: inherit;
+}
+
+.bill-mode-toggle a.active {
+    background: #fff;
+    color: var(--bill-coral);
+    box-shadow: 0 2px 6px rgba(32, 37, 43, 0.12);
+}
+
+.bill-paper {
+    position: relative;
+    overflow: hidden;
+    max-width: 850px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid var(--bill-line);
+    border-radius: 16px;
+    padding: 44px;
+    box-shadow: 0 10px 30px rgba(32, 37, 43, 0.07);
+}
+
+.bill-brand {
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: -0.4px;
+}
+
+.bill-business {
+    line-height: 1.55;
+}
+
+.bill-meta {
+    text-align: right;
+    line-height: 1.7;
+}
+
+.bill-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 28px;
+    border-bottom: 2px solid var(--bill-ink);
+    padding-bottom: 24px;
+    margin-bottom: 24px;
+}
+
+.bill-customer {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 0 18px;
+}
+
+.bill-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.bill-table th {
+    padding: 11px 8px;
+    text-align: left;
+    color: var(--bill-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    border-bottom: 1px solid var(--bill-line);
+}
+
+.bill-table td {
+    padding: 14px 8px;
+    border-bottom: 1px solid var(--bill-line);
+}
+
+.bill-table th:nth-child(n+2),
+.bill-table td:nth-child(n+2) {
+    text-align: right;
+}
+
+.bill-totals {
+    max-width: 350px;
+    margin: 22px 0 0 auto;
+}
+
+.bill-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 6px 0;
+}
+
+.bill-summary.tax-breakdown-line {
+    font-size: 13px;
+    color: #4b5563;
+    padding: 3px 0;
+}
+
+.bill-summary.khata-outstanding-line {
+    font-size: 13px;
+    color: #b45309;
+    background: #fffbeb;
+    padding: 6px 8px;
+    border-radius: 6px;
+    margin-top: 6px;
+    border: 1px solid #fde68a;
+}
+
+.bill-total {
+    font-size: 23px;
+    font-weight: 900;
+    border-top: 2px solid var(--bill-ink);
+    margin-top: 8px;
+    padding-top: 14px;
+}
+
+.bill-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    margin-top: 38px;
+    padding-top: 18px;
+    border-top: 1px solid var(--bill-line);
+}
+
+.bill-footnote {
+    text-align: center;
+    color: var(--bill-muted);
+    margin: 28px 0 0;
+    width: 100%;
+}
+
+/* Watermarks */
+.void-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 90px;
+    font-weight: 900;
+    color: rgba(220, 38, 38, 0.22);
+    border: 8px solid rgba(220, 38, 38, 0.22);
+    padding: 10px 40px;
+    border-radius: 16px;
+    pointer-events: none;
+    z-index: 10;
+    letter-spacing: 10px;
+    text-transform: uppercase;
+}
+
+.duplicate-watermark {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-25deg);
+    font-size: 64px;
+    font-weight: 900;
+    color: rgba(220, 38, 38, 0.18);
+    border: 6px solid rgba(220, 38, 38, 0.18);
+    padding: 8px 30px;
+    border-radius: 12px;
+    pointer-events: none;
+    z-index: 10;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.duplicate-badge {
+    display: inline-block;
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #f87171;
+    font-size: 11px;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+
+/* Thermal 80mm layout */
+.thermal-paper {
+    width: 80mm;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 5mm 4mm;
+    font-family: "Courier New", Courier, "Nirmala UI", "Latha", "Vijaya", "Tamil Sangam MN", "Noto Sans Tamil", monospace;
+    font-size: 12px;
+    line-height: 1.3;
+    box-shadow: none;
+    border: 0;
+    border-radius: 0;
+}
+
+.thermal-paper .bill-header {
+    display: block;
+    text-align: center;
+    border-bottom: 1px dashed #222;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+}
+
+.thermal-paper .bill-brand {
+    font-size: 18px;
+}
+
+.thermal-paper .bill-meta {
+    text-align: center;
+    line-height: 1.4;
+    margin-top: 7px;
+}
+
+.thermal-paper .bill-customer {
+    border-bottom: 1px dashed #222;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+
+.thermal-paper .bill-table {
+    font-size: 11px;
+}
+
+.thermal-paper .bill-table thead {
+    display: none;
+}
+
+.thermal-paper .bill-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 32px 68px;
+    gap: 4px;
+    padding: 4px 0;
+    border-bottom: 0;
+}
+
+.thermal-paper .bill-table td {
+    padding: 0;
+    border: 0;
+}
+
+.thermal-paper .bill-table td:nth-child(1) {
+    grid-column: 1 / -1;
+    font-weight: 800;
+}
+
+.thermal-paper .bill-table td:nth-child(2) {
+    grid-column: 2;
+    text-align: right;
+}
+
+.thermal-paper .bill-table td:nth-child(3) {
+    grid-column: 3;
+    text-align: right;
+}
+
+.thermal-paper .bill-table td:nth-child(4) {
+    grid-column: 3;
+    text-align: right;
+}
+
+.thermal-paper .bill-totals {
+    max-width: none;
+    border-top: 1px dashed #222;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+
+.thermal-paper .bill-summary {
+    padding: 2px 0;
+}
+
+.thermal-paper .bill-summary.tax-breakdown-line {
+    font-size: 11px;
+}
+
+.thermal-paper .bill-summary.khata-outstanding-line {
+    font-size: 11px;
+    padding: 4px;
+    background: transparent;
+    border: 1px dashed #222;
+}
+
+.thermal-paper .bill-total {
+    font-size: 16px;
+    border-top: 1px solid #222;
+    padding-top: 6px;
+}
+
+.thermal-paper .bill-footer {
+    display: block;
+    text-align: center;
+    border-top: 1px dashed #222;
+    margin-top: 12px;
+    padding-top: 12px;
+}
+
+.thermal-paper .bill-footnote {
+    margin-top: 10px;
+}
+
+.thermal-paper .void-watermark {
+    font-size: 42px;
+    border-width: 4px;
+    padding: 4px 16px;
+    letter-spacing: 4px;
+}
+
+.thermal-paper .duplicate-watermark {
+    font-size: 28px;
+    border-width: 3px;
+    padding: 4px 12px;
+    letter-spacing: 3px;
+}
+
+/* Thermal 58mm layout */
+.thermal58-paper {
+    width: 58mm;
+    padding: 4mm 3mm;
+    font-size: 10px;
+}
+
+.thermal58-paper .bill-brand {
+    font-size: 15px;
+}
+
+.thermal58-paper .bill-table {
+    font-size: 9px;
+}
+
+.thermal58-paper .bill-table tr {
+    grid-template-columns: minmax(0, 1fr) 22px 48px;
+    gap: 3px;
+}
+
+.thermal58-paper .bill-total {
+    font-size: 14px;
+}
+
+.thermal58-paper .duplicate-watermark {
+    font-size: 22px;
+    letter-spacing: 2px;
+    border-width: 2px;
+    padding: 2px 8px;
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+    .bill-actions {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .bill-actions-left {
+        flex-wrap: wrap;
+    }
+    .bill-actions-left .btn {
+        flex: 1;
+        min-width: 0;
+    }
+    .bill-mode-toggle {
+        justify-content: center;
+    }
+    .bill-mode-toggle a {
+        flex: 1;
+        text-align: center;
+    }
+    .bill-paper {
+        padding: 20px 14px;
+        border-radius: 10px;
+    }
+    .bill-header {
+        display: block;
+    }
+    .bill-meta {
+        text-align: left;
+        margin-top: 14px;
+    }
+    .bill-customer {
+        display: block;
+    }
+    .bill-customer b {
+        display: block;
+        margin-top: 5px;
+    }
+    .bill-footer {
+        align-items: center;
+        flex-direction: column;
+        text-align: center;
+        gap: 12px;
+    }
+}
+
+/* Print styles */
+@media print {
+    body {
+        background: #fff;
+    }
+    .bill-page {
+        padding: 0;
+    }
+    .bill-paper {
+        box-shadow: none;
+        margin: 0 auto;
+    }
+    .bill-actions,
+    .no-print {
+        display: none !important;
+    }
+    .bill-paper.thermal-paper {
+        width: 80mm;
+        padding: 4mm;
+    }
+    .bill-paper.thermal58-paper {
+        width: 58mm;
+        padding: 3mm;
+    }
+    .bill-paper.a4-paper {
+        max-width: none;
+        width: 190mm;
+        padding: 16mm;
+    }
+    .void-watermark {
+        color: rgba(0, 0, 0, 0.2) !important;
+        border-color: rgba(0, 0, 0, 0.2) !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .duplicate-watermark {
+        color: rgba(0, 0, 0, 0.2) !important;
+        border-color: rgba(0, 0, 0, 0.2) !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .duplicate-badge {
+        color: #000 !important;
+        border-color: #000 !important;
+    }
+}
+

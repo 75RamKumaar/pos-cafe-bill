@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Access Denied | Cafe POS{% endblock %}
+{% block eyebrow %}Security / Permission Denied{% endblock %}
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 40px auto; text-align: center; padding: 40px 24px;">
+    <div style="font-size: 54px; margin-bottom: 12px; line-height: 1;">🚫</div>
+    <h1 style="font-size: 26px; font-weight: 900; margin: 0 0 10px;">Access Denied (403)</h1>
+    <p class="muted" style="font-size: 15px; margin: 0 0 20px;">
+        Hello, <strong>{{ request.user.username }}</strong>. You do not have permission to access this page.
+    </p>
+    <div class="alert alert-error" style="text-align: left; margin-bottom: 24px;">
+        This page requires specific privileges. Your current role is <strong>{{ role_name }}</strong>.
+        {% if role_name == "No role" %}
+        You do not have any assigned roles yet. Please contact an Owner or administrator to grant you access.
+        {% endif %}
+    </div>
+    <div style="display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;">
+        {% if is_owner %}
+            <a class="btn btn-primary" href="{% url 'dashboard' %}">Go to Owner Dashboard</a>
+        {% elif is_cashier %}
+            <a class="btn btn-primary" href="{% url 'billing' %}">Go to Billing Counter</a>
+        {% endif %}
+        <form method="post" action="{% url 'logout' %}" style="display: inline; margin: 0;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline">Log out</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+

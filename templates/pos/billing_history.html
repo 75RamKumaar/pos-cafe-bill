@@ -2,9 +2,135 @@
 {% block title %}Billing History | Cafe POS{% endblock %}
 {% block eyebrow %}Billing / History{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Billing History</h1><p>Review saved bills and print receipts.</p></div><a class="btn btn-primary" href="{% url 'billing' %}">+ New Bill</a></div>
-<div class="card"><form method="get" class="actions"><input type="search" name="q" value="{{ query }}" placeholder="Search bill no. or customer" aria-label="Search bills"><input type="date" name="date" value="{{ selected_date }}" aria-label="Filter by date"><button type="submit">Search</button>{% if query or selected_date %}<a class="btn btn-outline" href="{% url 'billing_history' %}">Clear</a>{% endif %}</form></div>
-<div class="card"><div class="table-wrap"><table class="data-table"><thead><tr><th>Bill No.</th><th>Date</th><th>Customer</th><th>Total</th><th>Payment</th><th>Actions</th></tr></thead><tbody>
-{% for bill in bills %}<tr><td><b>{{ bill.bill_number }}</b></td><td>{{ bill.created_at|date:"d M Y, h:i A" }}</td><td>{{ bill.customer.name|default:"Walk-in customer" }}</td><td><b>₹{{ bill.grand_total|floatformat:2 }}</b></td><td><span class="pill pill-muted">{{ bill.get_payment_method_display }}</span></td><td><div class="actions"><a class="btn btn-soft" href="{% url 'bill_detail' bill.id %}">View</a><a class="btn btn-outline" href="{% url 'bill_detail' bill.id %}?print=1" target="_blank">Print Bill</a><form method="post" action="{% url 'bill_delete' bill.id %}" onsubmit="return confirm('Delete this bill?');">{% csrf_token %}<button type="submit" class="btn-danger">Delete</button></form></div></td></tr>{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">No bills match your search.</td></tr>{% endfor %}
-</tbody></table></div>{% include "_pagination.html" %}</div>
+<div class="page-head">
+    <div>
+        <h1>Billing History</h1>
+        <p>Review saved bills, filter by date, payment method, cashier, and status.</p>
+    </div>
+    <div class="actions">
+        <a class="btn btn-primary" href="{% url 'billing' %}">+ New Bill</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+    <form method="get" class="actions" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+        <div style="flex:1;min-width:180px;">
+            <label class="field-label" for="q">Search</label>
+            <input id="q" type="search" name="q" value="{{ query }}" placeholder="Search bill no. or customer" aria-label="Search bills">
+        </div>
+        <div style="min-width:130px;">
+            <label class="field-label" for="from_date">From Date</label>
+            <input id="from_date" type="date" name="from_date" value="{{ from_date }}" aria-label="From date">
+        </div>
+        <div style="min-width:130px;">
+            <label class="field-label" for="to_date">To Date</label>
+            <input id="to_date" type="date" name="to_date" value="{{ to_date }}" aria-label="To date">
+        </div>
+        <div>
+            <label class="field-label" for="payment_method">Payment</label>
+            <select id="payment_method" name="payment_method" aria-label="Filter by payment method">
+                <option value="">All payment methods</option>
+                {% for code, label in payment_methods %}
+                <option value="{{ code }}" {% if selected_payment_method == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="field-label" for="cashier">Cashier</label>
+            <select id="cashier" name="cashier" aria-label="Filter by cashier">
+                <option value="">All cashiers</option>
+                {% for c in cashiers %}
+                <option value="{{ c.username }}" {% if selected_cashier == c.username or selected_cashier == c.id|stringformat:"s" %}selected{% endif %}>{{ c.get_full_name|default:c.username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="field-label" for="status">Status</label>
+            <select id="status" name="status" aria-label="Filter by status">
+                <option value="">All statuses</option>
+                {% for code, label in status_choices %}
+                <option value="{{ code }}" {% if selected_status == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-outline" type="submit">Filter</button>
+            <a class="btn {% if is_today %}btn-primary{% else %}btn-outline{% endif %}" href="{% url 'billing_history' %}?today=1" title="Filter to today's bills">Today</a>
+            {% if query or from_date or to_date or selected_status or selected_payment_method or selected_cashier or is_today or selected_date %}
+            <a class="btn btn-outline" href="{% url 'billing_history' %}">Clear</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<div class="grid" style="margin-bottom:16px;">
+    <div class="card stat" style="margin-bottom:0;">
+        <span class="stat-label">Bills Count</span>
+        <h2 class="stat-value">{{ totals.bills_count }}</h2>
+        <span class="stat-note">{{ totals.active_count }} active{% if totals.void_count %}, {{ totals.void_count }} void{% endif %}</span>
+    </div>
+    <div class="card stat" style="margin-bottom:0;">
+        <span class="stat-label">Active Revenue</span>
+        <h2 class="stat-value">{{ business_settings.currency_symbol }}{{ totals.revenue|floatformat:2 }}</h2>
+        <span class="stat-note">Discount: {{ business_settings.currency_symbol }}{{ totals.discount|floatformat:2 }}</span>
+    </div>
+    <div class="card stat" style="margin-bottom:0;">
+        <span class="stat-label">Cash / UPI</span>
+        <h2 class="stat-value" style="font-size:22px;">{{ business_settings.currency_symbol }}{{ totals.cash|floatformat:2 }}</h2>
+        <span class="stat-note">UPI: {{ business_settings.currency_symbol }}{{ totals.upi|floatformat:2 }}</span>
+    </div>
+    <div class="card stat" style="margin-bottom:0;">
+        <span class="stat-label">Card / Khata</span>
+        <h2 class="stat-value" style="font-size:22px;">{{ business_settings.currency_symbol }}{{ totals.card|floatformat:2 }}</h2>
+        <span class="stat-note">Khata: {{ business_settings.currency_symbol }}{{ totals.khata|floatformat:2 }}</span>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Bill No.</th>
+                    <th>Token</th>
+                    <th>Date</th>
+                    <th>Cashier</th>
+                    <th>Customer</th>
+                    <th>Total</th>
+                    <th>Payment</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bill in bills %}
+                <tr>
+                    <td>
+                        <b>{{ bill.bill_number }}</b>
+                        {% if bill.status == "VOID" %}
+                        <span class="pill pill-danger" style="background:#fee2e2;color:#991b1b;border:1px solid #f87171;font-size:11px;padding:2px 6px;border-radius:9999px;margin-left:4px;">VOID</span>
+                        {% endif %}
+                    </td>
+                    <td>{% if bill.token_number %}<b>#{{ bill.token_number }}</b>{% else %}-{% endif %}</td>
+                    <td>{{ bill.created_at|date:"d M Y, h:i A" }}</td>
+                    <td>{{ bill.created_by.username|default:"-" }}</td>
+                    <td>{{ bill.customer.name|default:"Walk-in customer" }}</td>
+                    <td><b>{{ business_settings.currency_symbol }}{{ bill.grand_total|floatformat:2 }}</b></td>
+                    <td><span class="pill pill-muted">{{ bill.get_payment_method_display }}</span></td>
+                    <td>
+                        <div class="actions">
+                            <a class="btn btn-soft" href="{% url 'bill_detail' bill.id %}">View</a>
+                            <a class="btn btn-outline" href="{% url 'bill_detail' bill.id %}?print=1" target="_blank">Print Bill</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="muted" style="text-align:center;padding:30px;">No bills match your search.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "_pagination.html" %}
+</div>
 {% endblock %}

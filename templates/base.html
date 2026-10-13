@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en">
+{% load i18n static %}
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,10 +8,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#20252b">
+<link rel="manifest" href="{% url 'manifest' %}">
+<link rel="apple-touch-icon" href="{% static 'pos/icons/icon-192.png' %}">
+<link rel="icon" type="image/png" sizes="192x192" href="{% static 'pos/icons/icon-192.png' %}">
 <title>{% block title %}Cafe POS{% endblock %}</title>
 <style>
 :root{--brand:#e85d3f;--brand-strong:#c9442b;--brand-soft:#fff0ec;--ink:#20252b;--ink-soft:#35404a;--muted:#74808a;--surface:#fff;--surface-muted:#f8f9fa;--canvas:#f3f5f6;--line:#e3e8eb;--line-strong:#ccd4d9;--success:#16855b;--success-soft:#e7f6ef;--danger:#c63d3d;--danger-soft:#fdecec;--warning:#a96b10;--warning-soft:#fff5df;--shadow-sm:0 2px 8px rgba(32,37,43,.05);--shadow-md:0 12px 32px rgba(32,37,43,.08);--radius-sm:10px;--radius-md:14px;--radius-lg:18px;--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-7:32px;--space-8:40px;--sidebar-width:248px;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);--safe-left:env(safe-area-inset-left,0px);--safe-right:env(safe-area-inset-right,0px)}
-*{box-sizing:border-box}html{background:var(--canvas);scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}body{margin:0;background:var(--canvas);color:var(--ink);font-family:"DM Sans","Segoe UI",system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:wait;opacity:.68;transform:none!important}::selection{background:#ffd8ce;color:var(--ink)}img{max-width:100%;height:auto}
+*{box-sizing:border-box}html{background:var(--canvas);scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}body{margin:0;background:var(--canvas);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Nirmala UI","Latha","Vijaya","Tamil Sangam MN","Tamil MN","Noto Sans Tamil","DM Sans",sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:wait;opacity:.68;transform:none!important}::selection{background:#ffd8ce;color:var(--ink)}img{max-width:100%;height:auto}
 .app-shell{min-height:100vh;display:flex}.sidebar{width:var(--sidebar-width);flex:0 0 var(--sidebar-width);position:sticky;top:0;height:100vh;z-index:20;display:flex;flex-direction:column;padding:var(--space-7) var(--space-3);background:var(--ink);color:#fff}.brand{display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-3) var(--space-8);font-size:19px;letter-spacing:.1px}.brand-mark{width:40px;height:40px;display:grid;place-items:center;flex:0 0 40px;background:var(--brand);border-radius:var(--radius-md);font-size:20px}.nav-label{padding:0 var(--space-3) var(--space-3);color:#8f9aa4;text-transform:uppercase;letter-spacing:1.5px;font-size:10px;font-weight:800}.nav-links{display:grid;gap:var(--space-1)}.nav-link{display:flex;align-items:center;gap:var(--space-3);min-height:44px;border-radius:var(--radius-sm);padding:10px var(--space-3);color:#b9c1c7;font-weight:700;transition:background .16s ease,color .16s ease,transform .16s ease}.nav-link:hover{background:#30373e;color:#fff;transform:translateX(2px)}.nav-link.active{background:var(--brand);color:#fff;box-shadow:0 7px 16px rgba(232,93,63,.22)}.nav-icon{width:20px;text-align:center;font-size:16px}button.nav-link{border:0;background:transparent;width:100%;text-align:left;font-family:inherit;font-size:inherit;box-shadow:none;cursor:pointer}button.nav-link:hover{background:#30373e;color:#fff;transform:translateX(2px);box-shadow:none}.sidebar-footer{margin-top:auto;border-top:1px solid #353c43;padding:var(--space-5) var(--space-3) 0;color:#8f9aa4;font-size:12px;line-height:1.6}.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:7px}
 .mobile-bar{display:none}.sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:19;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}.main{min-width:0;flex:1}.topbar{height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 var(--space-7);background:rgba(255,255,255,.92);border-bottom:1px solid var(--line);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}.page-title{font-size:13px;font-weight:800;color:var(--muted);letter-spacing:.02em}.content{width:100%;max-width:1480px;margin:0 auto;padding:var(--space-7) var(--space-7) 56px}
 .page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-5);margin-bottom:var(--space-6);flex-wrap:wrap}.page-head h1{margin:0 0 var(--space-2);font-size:clamp(22px,4vw,32px);line-height:1.15;letter-spacing:-.5px}.page-head p{margin:0;color:var(--muted)}.page-head>div:first-child{min-width:0;flex:1}
@@ -31,29 +35,57 @@ input,select,textarea{width:100%;min-height:44px;padding:10px 12px;border:1px so
 </style>
 </head>
 <body>
-<div class="mobile-bar"><a class="brand" href="{% if is_owner %}{% url 'dashboard' %}{% else %}{% url 'billing' %}{% endif %}" style="padding:0"><span class="brand-mark">☕</span><b>Cafe POS</b></a><button class="mobile-toggle" aria-label="Open navigation">☰</button></div>
+<div class="mobile-bar"><a class="brand" href="{% if is_owner %}{% url 'dashboard' %}{% else %}{% url 'billing' %}{% endif %}" style="padding:0"><span class="brand-mark">☕</span><b>Cafe POS</b></a><div style="display:flex;align-items:center;gap:8px;"><button id="mobileInstallBtn" type="button" class="btn btn-soft" style="display:none;min-height:36px;padding:4px 10px;font-size:11px;" onclick="triggerAppInstall()">⬇️ {% trans "Install" %}</button><button class="mobile-toggle" aria-label="{% trans 'Open navigation' %}">☰</button></div></div>
 <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
 <div class="app-shell"><aside class="sidebar" id="sidebar">
-<a class="brand" href="{% if is_owner %}{% url 'dashboard' %}{% else %}{% url 'billing' %}{% endif %}"><span class="brand-mark">☕</span><b>Cafe POS</b></a><div class="nav-label">Workspace</div><nav class="nav-links">
+<a class="brand" href="{% if is_owner %}{% url 'dashboard' %}{% else %}{% url 'billing' %}{% endif %}"><span class="brand-mark">☕</span><b>Cafe POS</b></a><div class="nav-label">{% trans "Workspace" %}</div><nav class="nav-links">
 {% if request.user.is_authenticated %}
 {% if is_owner %}
-<a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}"><span class="nav-icon">▦</span>Dashboard</a>
-<a class="nav-link {% if request.resolver_match.url_name == 'menu_items' or request.resolver_match.url_name == 'menu_item_create' or request.resolver_match.url_name == 'menu_item_edit' %}active{% endif %}" href="{% url 'menu_items' %}"><span class="nav-icon">◈</span>Menu Items</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}"><span class="nav-icon">▦</span>{% trans "Dashboard" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'menu_items' or request.resolver_match.url_name == 'menu_item_create' or request.resolver_match.url_name == 'menu_item_edit' %}active{% endif %}" href="{% url 'menu_items' %}"><span class="nav-icon">◈</span>{% trans "Menu Items" %}</a>
 {% endif %}
-<a class="nav-link {% if request.resolver_match.url_name == 'billing' or request.resolver_match.url_name == 'billing_history' or request.resolver_match.url_name == 'bill_detail' %}active{% endif %}" href="{% url 'billing' %}"><span class="nav-icon">▤</span>Billing</a>
-<a class="nav-link {% if request.resolver_match.url_name == 'customers' or request.resolver_match.url_name == 'customer_create' or request.resolver_match.url_name == 'customer_detail' or request.resolver_match.url_name == 'customer_edit' %}active{% endif %}" href="{% url 'customers' %}"><span class="nav-icon">♙</span>Customers</a>
-<a class="nav-link {% if request.resolver_match.url_name == 'khata' or request.resolver_match.url_name == 'khata_payment' %}active{% endif %}" href="{% url 'khata' %}"><span class="nav-icon">📒</span>Khata</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'billing' or request.resolver_match.url_name == 'billing_history' or request.resolver_match.url_name == 'bill_detail' %}active{% endif %}" href="{% url 'billing' %}"><span class="nav-icon">▤</span>{% trans "Billing" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'customers' or request.resolver_match.url_name == 'customer_create' or request.resolver_match.url_name == 'customer_detail' or request.resolver_match.url_name == 'customer_edit' %}active{% endif %}" href="{% url 'customers' %}"><span class="nav-icon">♙</span>{% trans "Customers" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'khata' or request.resolver_match.url_name == 'khata_payment' %}active{% endif %}" href="{% url 'khata' %}"><span class="nav-icon">📒</span>{% trans "Khata" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'day_close' or request.resolver_match.url_name == 'shift_open' or request.resolver_match.url_name == 'shift_close' %}active{% endif %}" href="{% url 'day_close' %}"><span class="nav-icon">⏱</span>{% trans "Day Close" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'wastage' or request.resolver_match.url_name == 'wastage_list' or request.resolver_match.url_name == 'wastage_create' %}active{% endif %}" href="{% url 'wastage' %}"><span class="nav-icon">🗑️</span>{% trans "Wastage" %}</a>
 {% if is_owner %}
-<a class="nav-link {% if request.resolver_match.url_name == 'expenses' or request.resolver_match.url_name == 'expense_create' or request.resolver_match.url_name == 'expense_edit' %}active{% endif %}" href="{% url 'expenses' %}"><span class="nav-icon">◫</span>Expenses</a>
-<a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'reports' %}"><span class="nav-icon">▥</span>Reports</a>
-<a class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" href="{% url 'settings' %}"><span class="nav-icon">⚙</span>Settings</a>
-<a class="nav-link {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'audit_logs' %}"><span class="nav-icon">▤</span>Audit Logs</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'stock_items' or request.resolver_match.url_name == 'stock_list' or request.resolver_match.url_name == 'stock_item_create' or request.resolver_match.url_name == 'stock_item_edit' %}active{% endif %}" href="{% url 'stock_items' %}"><span class="nav-icon">📦</span>{% trans "Stock" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'purchases' or request.resolver_match.url_name == 'purchase_list' or request.resolver_match.url_name == 'purchase_create' or request.resolver_match.url_name == 'purchase_detail' %}active{% endif %}" href="{% url 'purchases' %}"><span class="nav-icon">🛒</span>{% trans "Purchases" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'suppliers' or request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_create' or request.resolver_match.url_name == 'supplier_detail' or request.resolver_match.url_name == 'supplier_edit' %}active{% endif %}" href="{% url 'suppliers' %}"><span class="nav-icon">🏭</span>{% trans "Suppliers" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'expenses' or request.resolver_match.url_name == 'expense_create' or request.resolver_match.url_name == 'expense_edit' %}active{% endif %}" href="{% url 'expenses' %}"><span class="nav-icon">◫</span>{% trans "Expenses" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}" href="{% url 'reports' %}"><span class="nav-icon">▥</span>{% trans "Reports" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'daily_summary' %}active{% endif %}" href="{% url 'daily_summary' %}"><span class="nav-icon">📊</span>{% trans "Daily Summary" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}" href="{% url 'settings' %}"><span class="nav-icon">⚙</span>{% trans "Settings" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'staff_list' or request.resolver_match.url_name == 'staff_edit' %}active{% endif %}" href="{% url 'staff_list' %}"><span class="nav-icon">👥</span>{% trans "Staff" %}</a>
+<a class="nav-link {% if request.resolver_match.url_name == 'audit_logs' %}active{% endif %}" href="{% url 'audit_logs' %}"><span class="nav-icon">▤</span>{% trans "Audit Logs" %}</a>
 {% endif %}
-<form method="post" action="{% url 'logout' %}" style="display:block;margin:0;padding:0">{% csrf_token %}<button type="submit" class="nav-link"><span class="nav-icon">↪</span>Log out</button></form>
+<form method="post" action="{% url 'logout' %}" style="display:block;margin:0;padding:0">{% csrf_token %}<button type="submit" class="nav-link"><span class="nav-icon">↪</span>{% trans "Log out" %}</button></form>
 {% endif %}
-</nav><div class="sidebar-footer">Local workspace<br><span class="status-dot"></span>Ready for business</div>
-</aside><main class="main"><header class="topbar"><span class="page-title">{% block eyebrow %}Cafe operations{% endblock %}</span><span class="muted"><span class="status-dot"></span>System online</span></header><div class="content">
-{% if messages %}<div class="messages" aria-live="polite">{% for message in messages %}<div class="toast {% if message.tags == 'error' %}toast-error{% endif %}" role="status"><span>{{ message }}</span><button type="button" class="toast-close" aria-label="Dismiss message">×</button></div>{% endfor %}</div>{% endif %}
+</nav><div class="sidebar-footer">
+{% if request.user.is_authenticated %}
+<div style="font-weight:800;color:#fff;font-size:13px;margin-bottom:4px;">{{ request.user.username }}</div>
+<span class="pill {% if role_name == 'Owner' %}pill-success{% elif role_name == 'Cashier' %}pill-muted{% else %}pill-danger{% endif %}" style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;">{{ role_name }}</span>
+{% else %}
+{% trans "Local workspace" %}
+{% endif %}
+<div style="margin-top:6px;"><span class="status-dot"></span>{% trans "Ready for business" %}</div>
+<form action="{% url 'set_language' %}" method="post" class="language-switch-form" style="margin-top:10px;">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <div style="display:flex;align-items:center;gap:6px;">
+        <label for="sidebarLangSelect" style="font-size:12px;color:#8f9aa4;" aria-label="{% trans 'Language' %}">🌐</label>
+        <select id="sidebarLangSelect" name="language" onchange="this.form.submit()" style="background:#262d35;color:#e3e8eb;border:1px solid #3c4652;border-radius:6px;padding:3px 8px;font-size:11px;min-height:30px;height:30px;cursor:pointer;">
+            <option value="en" {% if LANGUAGE_CODE == 'en' or not LANGUAGE_CODE or LANGUAGE_CODE|slice:':2' == 'en' %}selected{% endif %}>English</option>
+            <option value="ta" {% if LANGUAGE_CODE|slice:':2' == 'ta' %}selected{% endif %}>தமிழ்</option>
+        </select>
+    </div>
+</form>
+<button id="sidebarInstallBtn" type="button" class="btn btn-soft" style="display:none;width:100%;min-height:36px;padding:6px 12px;font-size:12px;margin-top:10px;text-align:center;" onclick="triggerAppInstall()">⬇️ {% trans "Install app" %}</button>
+</div>
+</aside><main class="main"><header class="topbar"><span class="page-title">{% block eyebrow %}{% trans "Cafe operations" %}{% endblock %}</span><div style="display:flex;align-items:center;gap:12px;"><button id="topbarInstallBtn" type="button" class="btn btn-soft" style="display:none;min-height:36px;padding:6px 14px;font-size:12px;border-radius:var(--radius-sm);" onclick="triggerAppInstall()">⬇️ {% trans "Install app" %}</button><span id="connectionStatus" class="muted"><span id="connectionDot" class="status-dot"></span><span id="connectionText">{% trans "System online" %}</span></span></div></header><div class="content">
+<div id="globalOfflineBanner" class="alert alert-error" style="display:none;margin-bottom:var(--space-4);background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger);font-weight:700;align-items:center;gap:10px;"><span style="font-size:18px;">⚠️</span><span>{% trans "You are currently offline. Server connection is unavailable. Billing and changes are disabled until reconnected." %}</span></div>
+{% if messages %}<div class="messages" aria-live="polite">{% for message in messages %}<div class="toast {% if message.tags == 'error' %}toast-error{% endif %}" role="status"><span>{{ message }}</span><button type="button" class="toast-close" aria-label="{% trans 'Dismiss message' %}">×</button></div>{% endfor %}</div>{% endif %}
 {% block content %}{% endblock %}
 </div></main></div>
 <script>
@@ -63,6 +95,72 @@ function openSidebar(){document.getElementById('sidebar').classList.add('open');
 function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarBackdrop').classList.remove('open');document.body.style.overflow='';}
 document.querySelector('.mobile-toggle').addEventListener('click',function(){const sidebar=document.getElementById('sidebar');if(sidebar.classList.contains('open'))closeSidebar();else openSidebar();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeSidebar();});
+
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    ['topbarInstallBtn', 'sidebarInstallBtn', 'mobileInstallBtn'].forEach(function(id) {
+        const btn = document.getElementById(id);
+        if (btn) btn.style.display = (id === 'topbarInstallBtn' ? 'inline-flex' : 'block');
+    });
+});
+window.addEventListener('appinstalled', function() {
+    deferredInstallPrompt = null;
+    ['topbarInstallBtn', 'sidebarInstallBtn', 'mobileInstallBtn'].forEach(function(id) {
+        const btn = document.getElementById(id);
+        if (btn) btn.style.display = 'none';
+    });
+});
+function triggerAppInstall() {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.then(function(choiceResult) {
+        if (choiceResult.outcome === 'accepted') {
+            console.log('PWA installation accepted');
+        }
+        deferredInstallPrompt = null;
+        ['topbarInstallBtn', 'sidebarInstallBtn', 'mobileInstallBtn'].forEach(function(id) {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = 'none';
+        });
+    });
+}
+
+function updateOnlineStatus(){
+    const statusEl = document.getElementById('connectionStatus');
+    const dotEl = document.getElementById('connectionDot');
+    const textEl = document.getElementById('connectionText');
+    const offlineBanner = document.getElementById('globalOfflineBanner');
+    const isOnline = navigator.onLine;
+    if(offlineBanner){
+        offlineBanner.style.display = isOnline ? 'none' : 'flex';
+    }
+    if(!statusEl || !dotEl || !textEl) return;
+    if(isOnline){
+        statusEl.className = 'muted';
+        dotEl.style.backgroundColor = 'var(--success)';
+        textEl.textContent = 'System online';
+        textEl.style.color = '';
+    } else {
+        statusEl.className = 'danger';
+        dotEl.style.backgroundColor = 'var(--danger)';
+        textEl.textContent = 'Offline';
+        textEl.style.color = 'var(--danger)';
+    }
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+updateOnlineStatus();
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .catch(function(err) {
+                console.warn('ServiceWorker registration failed:', err);
+            });
+    });
+}
 </script>
 </body>
 </html>

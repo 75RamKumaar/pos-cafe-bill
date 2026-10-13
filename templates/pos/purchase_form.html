@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}New Purchase | Cafe POS{% endblock %}
+{% block eyebrow %}Inventory Management{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Record Purchase / Inward Stock</h1>
+    <p>Add raw materials to inventory, update latest unit cost, and manage payment or supplier dues.</p>
+  </div>
+  <div class="actions">
+    <a href="{% url 'purchases' %}" class="btn btn-outline">Back to Purchases</a>
+  </div>
+</div>
+
+<form method="post" id="purchaseForm" style="display:grid; grid-template-columns:minmax(0, 1.8fr) minmax(300px, 1fr); gap:var(--space-5); align-items:start;">
+  {% csrf_token %}
+
+  <div class="card">
+    <h3 style="margin-top:0;">1. Purchase Items</h3>
+    <p class="helptext" style="margin-top:-8px; margin-bottom:var(--space-4);">
+      Select raw materials and enter quantities and unit costs. Stock item quantities and cost-per-unit will be updated automatically.
+    </p>
+
+    <div class="table-wrap">
+      <table class="data-table" id="linesTable">
+        <thead>
+          <tr>
+            <th style="min-width:200px;">Stock Item *</th>
+            <th style="width:120px;">Quantity *</th>
+            <th style="width:140px;">Unit Cost (₹) *</th>
+            <th style="width:120px;">Line Total (₹)</th>
+            <th style="width:50px;"></th>
+          </tr>
+        </thead>
+        <tbody id="linesBody">
+          <!-- Rows will be injected here via JS, initial row rendered for fallback -->
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:var(--space-3);">
+      <button type="button" class="btn btn-outline" id="addRowBtn" style="min-height:36px; padding:6px 14px; font-size:13px;">
+        + Add Another Item
+      </button>
+    </div>
+  </div>
+
+  <div class="card" style="position:sticky; top:var(--space-4);">
+    <h3 style="margin-top:0;">2. Supplier & Payment</h3>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.supplier.id_for_label }}">Supplier *</label>
+      {{ form.supplier }}
+      {% if form.supplier.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.supplier.errors|striptags }}</div>{% endif %}
+      <div style="margin-top:4px;">
+        <a href="{% url 'supplier_create' %}" target="_blank" style="font-size:12px; color:var(--brand-strong); font-weight:700;">+ Add New Supplier</a>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.date.id_for_label }}">Purchase Date *</label>
+      {{ form.date }}
+      {% if form.date.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.date.errors|striptags }}</div>{% endif %}
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.method.id_for_label }}">Payment Method *</label>
+      {{ form.method }}
+      {% if form.method.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.method.errors|striptags }}</div>{% endif %}
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.paid_amount.id_for_label }}">Paid Amount (₹)</label>
+      {{ form.paid_amount }}
+      {% if form.paid_amount.errors %}<div class="alert alert-error" style="margin-top:6px;">{{ form.paid_amount.errors|striptags }}</div>{% endif %}
+      <div class="helptext">Leave 0 if purchased on credit / due. Any unpaid balance adds to supplier dues.</div>
+    </div>
+
+    <div class="field" id="drawerExpenseContainer" style="background:var(--surface-muted); padding:var(--space-3); border-radius:var(--radius-sm); border:1px solid var(--line);">
+      <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; font-size:13px; font-weight:700;">
+        {{ form.post_to_drawer }}
+        <span>Post cash payment to current shift drawer expense</span>
+      </label>
+      {% if open_shift %}
+        <div class="helptext" style="color:var(--success); margin-top:4px;">
+          ✓ Active shift open (Shift #{{ open_shift.id }} opened by {{ open_shift.opened_by.username|default:"Staff" }}).
+        </div>
+      {% else %}
+        <div class="helptext" style="color:var(--muted); margin-top:4px;">
+          ℹ No shift currently open. Drawer expense will not be deducted.
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="{{ form.note.id_for_label }}">Notes / Invoice Memo</label>
+      {{ form.note }}
+    </div>
+
+    <div style="border-top:2px solid var(--line); padding-top:var(--space-3); margin-top:var(--space-4);">
+      <div class="summary-line">
+        <span class="muted">Items Total:</span>
+        <b id="summaryTotal" style="font-size:16px;">₹0.00</b>
+      </div>
+      <div class="summary-line">
+        <span class="muted">Paid Amount:</span>
+        <span id="summaryPaid" style="font-weight:700; color:var(--success);">₹0.00</span>
+      </div>
+      <div class="summary-line" style="font-size:17px; font-weight:900; margin-top:4px;">
+        <span>Balance Due:</span>
+        <span id="summaryDue" style="color:var(--danger);">₹0.00</span>
+      </div>
+    </div>
+
+    <div style="margin-top:var(--space-5);">
+      <button type="submit" class="btn btn-primary" style="width:100%;" id="submitBtn">Save Purchase</button>
+    </div>
+  </div>
+</form>
+
+<script>
+const stockItems = [
+  {% for s in stock_items %}
+  { id: {{ s.id }}, name: "{{ s.name|escapejs }}", unit: "{{ s.unit|escapejs }}", cost: "{{ s.cost_per_unit|floatformat:2 }}" },
+  {% endfor %}
+];
+
+const tbody = document.getElementById('linesBody');
+const addRowBtn = document.getElementById('addRowBtn');
+const paidInput = document.getElementById('paidAmountInput');
+const methodSelect = document.getElementById('id_method');
+const drawerBox = document.getElementById('drawerExpenseContainer');
+const summaryTotal = document.getElementById('summaryTotal');
+const summaryPaid = document.getElementById('summaryPaid');
+const summaryDue = document.getElementById('summaryDue');
+
+function createRow(itemId = '', qty = '', cost = '') {
+  const tr = document.createElement('tr');
+  tr.className = 'line-row';
+
+  let optionsHtml = '<option value="">-- Select Stock Item --</option>';
+  stockItems.forEach(item => {
+    const sel = (String(item.id) === String(itemId)) ? 'selected' : '';
+    optionsHtml += `<option value="${item.id}" data-cost="${item.cost}" data-unit="${item.unit}" ${sel}>${item.name} (${item.unit})</option>`;
+  });
+
+  tr.innerHTML = `
+    <td>
+      <select name="stock_item[]" class="item-select" required style="min-width:180px;">
+        ${optionsHtml}
+      </select>
+    </td>
+    <td>
+      <input type="number" step="0.01" min="0.01" name="qty[]" class="qty-input" value="${qty}" placeholder="Qty" required style="width:100px;">
+    </td>
+    <td>
+      <input type="number" step="0.01" min="0.00" name="unit_cost[]" class="cost-input" value="${cost}" placeholder="₹ / unit" required style="width:110px;">
+    </td>
+    <td>
+      <span class="line-total-text" style="font-weight:700;">₹0.00</span>
+    </td>
+    <td style="text-align:center;">
+      <button type="button" class="btn btn-outline remove-row-btn" style="min-height:30px; height:30px; width:30px; padding:0; color:var(--danger); border-color:var(--danger-soft);">✕</button>
+    </td>
+  `;
+
+  const selEl = tr.querySelector('.item-select');
+  const qtyEl = tr.querySelector('.qty-input');
+  const costEl = tr.querySelector('.cost-input');
+  const totalEl = tr.querySelector('.line-total-text');
+  const rmBtn = tr.querySelector('.remove-row-btn');
+
+  selEl.addEventListener('change', () => {
+    const opt = selEl.selectedOptions[0];
+    if (opt && opt.dataset.cost && (!costEl.value || costEl.value === '0.00' || costEl.value === '0')) {
+      costEl.value = opt.dataset.cost;
+    }
+    recalculate();
+  });
+
+  qtyEl.addEventListener('input', recalculate);
+  costEl.addEventListener('input', recalculate);
+
+  rmBtn.addEventListener('click', () => {
+    if (tbody.querySelectorAll('.line-row').length > 1) {
+      tr.remove();
+      recalculate();
+    } else {
+      alert('A purchase must have at least one line item.');
+    }
+  });
+
+  tbody.appendChild(tr);
+  recalculate();
+}
+
+function recalculate() {
+  let total = 0;
+  tbody.querySelectorAll('.line-row').forEach(row => {
+    const q = parseFloat(row.querySelector('.qty-input').value) || 0;
+    const c = parseFloat(row.querySelector('.cost-input').value) || 0;
+    const rowTotal = q * c;
+    row.querySelector('.line-total-text').textContent = '₹' + rowTotal.toFixed(2);
+    total += rowTotal;
+  });
+
+  summaryTotal.textContent = '₹' + total.toFixed(2);
+
+  // If paidInput is empty or default, suggest total if paid method is cash/upi/card
+  let paid = parseFloat(paidInput.value);
+  if (isNaN(paid)) paid = 0;
+
+  summaryPaid.textContent = '₹' + paid.toFixed(2);
+  const due = Math.max(0, total - paid);
+  summaryDue.textContent = '₹' + due.toFixed(2);
+}
+
+function updateDrawerVisibility() {
+  if (methodSelect && drawerBox) {
+    if (methodSelect.value === 'CASH') {
+      drawerBox.style.display = 'block';
+    } else {
+      drawerBox.style.display = 'none';
+    }
+  }
+}
+
+addRowBtn.addEventListener('click', () => createRow());
+paidInput.addEventListener('input', recalculate);
+if (methodSelect) {
+  methodSelect.addEventListener('change', () => {
+    updateDrawerVisibility();
+    if (methodSelect.value === 'CREDIT' && (!paidInput.value || paidInput.value === '0.00')) {
+      paidInput.value = '0.00';
+      recalculate();
+    }
+  });
+}
+
+// Initial state: create 1 empty row
+createRow();
+updateDrawerVisibility();
+</script>
+{% endblock %}
+

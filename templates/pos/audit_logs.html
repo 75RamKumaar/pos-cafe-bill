@@ -2,8 +2,103 @@
 {% block title %}Audit Logs | Cafe POS{% endblock %}
 {% block eyebrow %}Administration / Audit Logs{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Audit Logs</h1><p>Review recorded deletions and Khata payments.</p></div></div>
-<div class="card"><div class="table-wrap"><table class="data-table"><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Model</th><th>Object</th><th>Details</th></tr></thead><tbody>
-{% for log in logs %}<tr><td>{{ log.timestamp|date:"d M Y, h:i A" }}</td><td>{{ log.actor|default:"System / Anonymous" }}</td><td>{{ log.action }}</td><td>{{ log.model_name }}</td><td>{{ log.object_repr }}</td><td>{{ log.details }}</td></tr>{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">No audit events recorded.</td></tr>{% endfor %}
-</tbody></table></div>{% include "_pagination.html" %}</div>
+<div class="page-head">
+  <div>
+    <h1>Audit Logs</h1>
+    <p>Track system changes, security events, and administrative activities.</p>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+  <form method="get" class="actions" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+    <select name="user" style="min-width:140px;">
+      <option value="">All Users</option>
+      {% for u in users %}
+        <option value="{{ u.username }}"{% if selected_user == u.username or selected_user == u.id|stringformat:"s" %} selected{% endif %}>{{ u.username }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="action" style="min-width:140px;">
+      <option value="">All Actions</option>
+      {% for act in actions %}
+        <option value="{{ act }}"{% if selected_action == act %} selected{% endif %}>{{ act }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="model" style="min-width:140px;">
+      <option value="">All Models</option>
+      {% for m in models %}
+        <option value="{{ m }}"{% if selected_model == m %} selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+
+    <div style="display:flex; align-items:center; gap:6px;">
+      <input type="date" name="from_date" value="{{ from_date }}" title="From Date">
+      <span class="muted">to</span>
+      <input type="date" name="to_date" value="{{ to_date }}" title="To Date">
+    </div>
+
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a class="btn btn-outline" href="{% url 'audit_logs' %}">Clear</a>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="white-space:nowrap;">Time</th>
+          <th>Actor</th>
+          <th>Action</th>
+          <th>Model</th>
+          <th>Object</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td style="white-space:nowrap;">{{ log.timestamp|date:"d M Y, h:i A" }}</td>
+          <td><b>{{ log.actor.username|default:"System / Anonymous" }}</b></td>
+          <td>
+            <span class="badge" style="display:inline-block; font-size:0.8rem; font-weight:600;">{{ log.action }}</span>
+          </td>
+          <td>{{ log.model_name }}</td>
+          <td>{{ log.object_repr }}</td>
+          <td style="max-width:380px;">
+            {% if log.formatted_details %}
+              <div style="display:flex; flex-direction:column; gap:4px; font-size:0.875rem;">
+                {% for item in log.formatted_details %}
+                  <div>
+                    <span style="font-weight:600; color:var(--text, #334155);">{{ item.field }}:</span>
+                    {% if item.is_diff %}
+                      <span style="color:var(--muted, #64748b); text-decoration:line-through;">{{ item.old }}</span>
+                      <span style="color:var(--muted, #64748b); margin:0 2px;">→</span>
+                      <span style="font-weight:600; color:var(--primary, #0284c7);">{{ item.new }}</span>
+                    {% elif item.new is not None %}
+                      <span style="color:var(--text, #0f172a);">{{ item.new }}</span>
+                    {% elif item.old is not None %}
+                      <span style="color:var(--danger, #dc2626); text-decoration:line-through;">{{ item.old }}</span>
+                    {% else %}
+                      <span class="muted">—</span>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="muted" style="text-align:center;padding:30px">No audit events recorded.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "_pagination.html" %}
+</div>
 {% endblock %}
